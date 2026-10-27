@@ -384,18 +384,20 @@ class AttemptRepository:
                     .select('*, students(*), quizzes(*, subjects(name))')\
                     .neq('status', 'in_progress')\
                     .order('obtained_marks', desc=True)
-                
+
                 if filters.get('quiz_id') and filters['quiz_id'] != 'ALL':
                     query = query.eq('quiz_id', filters['quiz_id'])
+
                 if filters.get('status') and filters['status'] != 'ALL':
                     query = query.eq('status', filters['status'])
-                
+
                 res = query.execute()
+
                 for att in (res.data or []):
                     s = att.get('students') or {}
                     q = att.get('quizzes') or {}
                     sub = q.get('subjects') or {}
-                    
+
                     rows.append({
                         'id': att['id'],
                         'attemptId': att['id'],
@@ -407,7 +409,11 @@ class AttemptRepository:
                         'department': s.get('department') or '-',
                         'quizId': att['quiz_id'],
                         'quizTitle': q.get('title') or 'Unit Examination',
-                        'subjectName': sub.get('name') or q.get('subject') or 'General Subject',
+                        'subjectName': (
+                            sub.get('name')
+                            or q.get('subject')
+                            or 'General Subject'
+                        ),
                         'unitNumber': q.get('unit_number') or 1,
                         'marks': float(att.get('obtained_marks', 0.0)),
                         'totalMarks': float(att.get('total_marks', 0.0)),
@@ -416,17 +422,37 @@ class AttemptRepository:
                         'wrong': int(att.get('wrong_answers', 0)),
                         'unattempted': int(att.get('unattempted', 0)),
                         'status': att['status'],
-                        'submittedAt': att.get('submitted_at') or att.get('created_at')
+                        'submittedAt': (
+                            att.get('submitted_at')
+                            or att.get('created_at')
+                        )
                     })
-            except Exception as e:
-                logger.error("Supabase get_admin_results_table error: %s", e)
 
-        if len(rows) == 0:
+            except Exception as e:
+                logger.exception(
+                    "Supabase get_admin_results_table error"
+                )
+                raise RuntimeError(
+                    f"Database error loading admin results: {e}"
+                )
+
+        else:
+            # SQLite is used only when Supabase is unavailable.
             conn = get_db_connection()
             cursor = conn.cursor()
+
             cursor.execute("""
-            SELECT a.*, s.full_name as student_name, s.roll_number, s.division, s.class_name, s.department,
-                   q.title as quiz_title, q.unit_number, q.subject as quiz_subject, subj.name as sub_name
+            SELECT
+                a.*,
+                s.full_name as student_name,
+                s.roll_number,
+                s.division,
+                s.class_name,
+                s.department,
+                q.title as quiz_title,
+                q.unit_number,
+                q.subject as quiz_subject,
+                subj.name as sub_name
             FROM attempts a
             JOIN students s ON a.student_id = s.id
             JOIN quizzes q ON a.quiz_id = q.id
@@ -434,8 +460,10 @@ class AttemptRepository:
             WHERE a.status != 'in_progress'
             ORDER BY a.obtained_marks DESC, a.percentage DESC
             """)
+
             for r in cursor.fetchall():
                 d = dict(r)
+
                 rows.append({
                     'id': d['id'],
                     'attemptId': d['id'],
@@ -447,7 +475,11 @@ class AttemptRepository:
                     'department': d.get('department') or '-',
                     'quizId': d['quiz_id'],
                     'quizTitle': d.get('quiz_title') or 'Unit Examination',
-                    'subjectName': d.get('sub_name') or d.get('quiz_subject') or 'General Subject',
+                    'subjectName': (
+                        d.get('sub_name')
+                        or d.get('quiz_subject')
+                        or 'General Subject'
+                    ),
                     'unitNumber': d.get('unit_number') or 1,
                     'marks': float(d.get('obtained_marks', 0.0)),
                     'totalMarks': float(d.get('total_marks', 0.0)),
@@ -456,44 +488,71 @@ class AttemptRepository:
                     'wrong': int(d.get('wrong_answers', 0)),
                     'unattempted': int(d.get('unattempted', 0)),
                     'status': d['status'],
-                    'submittedAt': d.get('submitted_at') or d.get('created_at')
+                    'submittedAt': (
+                        d.get('submitted_at')
+                        or d.get('created_at')
+                    )
                 })
+
             conn.close()
 
-        # Apply in-memory filtering for search, division, unitNumber
+        # Apply in-memory filtering
         if filters.get('search'):
             q_str = str(filters['search']).lower().strip()
-            rows = [r for r in rows if q_str in r['studentName'].lower() or q_str in r['rollNumber'].lower() or q_str in r['quizTitle'].lower()]
+            rows = [
+                r for r in rows
+                if q_str in r['studentName'].lower()
+                or q_str in r['rollNumber'].lower()
+                or q_str in r['quizTitle'].lower()
+            ]
 
         if filters.get('division') and filters['division'] != 'ALL':
             div_val = str(filters['division']).upper().strip()
-            rows = [r for r in rows if r['division'].upper() == div_val]
+            rows = [
+                r for r in rows
+                if r['division'].upper() == div_val
+            ]
 
         if filters.get('unitNumber') and int(filters['unitNumber']) > 0:
             u_num = int(filters['unitNumber'])
-            rows = [r for r in rows if r['unitNumber'] == u_num]
+            rows = [
+                r for r in rows
+                if r['unitNumber'] == u_num
+            ]
 
         if filters.get('quiz_id') and filters['quiz_id'] != 'ALL':
             q_val = str(filters['quiz_id']).strip()
-            rows = [r for r in rows if str(r['quizId']) == q_val]
+            rows = [
+                r for r in rows
+                if str(r['quizId']) == q_val
+            ]
 
         if filters.get('class_name') and filters['class_name'] != 'ALL':
             c_val = str(filters['class_name']).strip().lower()
-            rows = [r for r in rows if r['className'].strip().lower() == c_val]
+            rows = [
+                r for r in rows
+                if r['className'].strip().lower() == c_val
+            ]
 
         if filters.get('status') and filters['status'] != 'ALL':
             st_val = str(filters['status']).strip().upper()
-            rows = [r for r in rows if r['status'].upper() == st_val]
+            rows = [
+                r for r in rows
+                if r['status'].upper() == st_val
+            ]
 
-        # Sort by marks desc, percentage desc
-        rows.sort(key=lambda x: (x['marks'], x['percentage']), reverse=True)
+        rows.sort(
+            key=lambda x: (x['marks'], x['percentage']),
+            reverse=True
+        )
 
-        # Dynamic ranking assignment
         ranked_rows = []
         cur_rank = 1
+
         for idx, row in enumerate(rows):
             if idx > 0 and row['marks'] < rows[idx - 1]['marks']:
                 cur_rank = idx + 1
+
             row_copy = dict(row)
             row_copy['rank'] = cur_rank
             ranked_rows.append(row_copy)
