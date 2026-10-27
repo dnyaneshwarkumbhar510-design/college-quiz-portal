@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}My Examination Results History{% endblock %}
+
+{% block content %}
+<div style="max-width: 1280px; margin: 0 auto; padding: 32px 16px;">
+  <!-- Header -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <a href="{{ url_for('student.student_dashboard') }}" style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-decoration: none;">
+        ← Back to Dashboard
+      </a>
+      <h1 style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 4px;">My Examination Results History</h1>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+        Candidate: <strong>{{ student.full_name }}</strong> (Roll No: {{ student.roll_number }} • Div {{ student.division }})
+      </p>
+    </div>
+  </div>
+
+  {% if attempts and attempts|length > 0 %}
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Examination</th>
+            <th>Unit</th>
+            <th>Marks Obtained</th>
+            <th>Total Marks</th>
+            <th>Percentage</th>
+            <th>Correct</th>
+            <th>Wrong</th>
+            <th>Status</th>
+            <th>Submitted At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in attempts %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td><strong>{{ a.quiz.title if a.quiz else 'Unit Examination' }}</strong></td>
+              <td><span class="badge badge-navy">Unit {{ a.quiz.unit_number if a.quiz else 1 }}</span></td>
+              <td><strong style="color: #2563eb;">{{ a.obtained_marks }}</strong></td>
+              <td>{{ a.total_marks }}</td>
+              <td><strong>{{ a.percentage }}%</strong></td>
+              <td><span style="color: #16a34a; font-weight: 700;">{{ a.correct_answers }}</span></td>
+              <td><span style="color: #dc2626; font-weight: 700;">{{ a.wrong_answers }}</span></td>
+              <td>
+                <span class="badge {% if a.status == 'PASS' %}badge-success{% else %}badge-danger{% endif %}">
+                  {{ a.status }}
+                </span>
+              </td>
+              <td>{{ a.submitted_at|format_date }}</td>
+              <td>
+                <a href="{{ url_for('student.student_result_page', attempt_id=a.id) }}" class="btn btn-sm btn-outline-dark">
+                  View Scorecard →
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card" style="padding: 48px; text-align: center; color: var(--text-muted);">
+      <div style="font-size: 36px; margin-bottom: 12px;">📊</div>
+      <h3 style="font-size: 16px; font-weight: 700; color: #0f172a;">No Examination Records Yet</h3>
+      <p style="font-size: 13px; margin-top: 4px;">You have not completed any quizzes yet. Visit the dashboard to start an available quiz.</p>
+      <a href="{{ url_for('student.student_dashboard') }}" class="btn btn-navy btn-sm" style="margin-top: 16px;">
+        Go to Dashboard →
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

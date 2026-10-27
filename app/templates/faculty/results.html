@@ -1,0 +1,357 @@
+{% extends "faculty/shell.html" %}
+
+{% block title %}Results & Rankings{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; flex-wrap: wrap;">
+  <div>
+    <span class="section-tag">Academic Records</span>
+    <h1 style="font-size: 24px; font-weight: 900; color: #0f172a; letter-spacing: -0.01em;">Results & Leaderboards</h1>
+    <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+      Comprehensive candidate evaluations, unit-wise rankings, and 60-mark course aggregates.
+    </p>
+  </div>
+
+  <div style="display: flex; gap: 8px;">
+    <button type="button" class="btn btn-navy btn-sm" onclick="exportCurrentViewCsv()">
+      <span>📊 Export CSV Report</span>
+    </button>
+  </div>
+</div>
+
+<!-- View Switcher Tabs -->
+<div style="display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 12px; overflow-x: auto;">
+  <button type="button" class="btn btn-sm btn-navy view-tab-btn active" id="tabResultsTable" onclick="switchView('table')">
+    📋 All Results Table
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-dark view-tab-btn" id="tabOverallRankings" onclick="switchView('overall')">
+    🏆 Overall Course Leaderboard (60 Marks)
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-dark view-tab-btn" id="tabUnitRankings" onclick="switchView('unit')">
+    🎖️ Unit Leaderboards
+  </button>
+</div>
+
+<!-- VIEW 1: RESULTS TABLE -->
+<div id="viewResultsTable">
+  <!-- Filter Box -->
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-body" style="padding: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; align-items: flex-end;">
+        <div>
+          <label class="form-label" for="resSearch">Search Candidate / Quiz</label>
+          <input type="text" id="resSearch" class="form-control" placeholder="Search name, roll, or quiz..." onkeyup="filterResultsTable()">
+        </div>
+
+        <div>
+          <label class="form-label" for="resDivFilter">Division</label>
+          <select id="resDivFilter" class="form-control" onchange="filterResultsTable()">
+            <option value="ALL">All Divisions</option>
+            {% for div in divisions %}
+              <option value="{{ div }}">Division {{ div }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label" for="resUnitFilter">Unit Number</label>
+          <select id="resUnitFilter" class="form-control" onchange="filterResultsTable()">
+            <option value="ALL">All Units</option>
+            <option value="1">Unit 1</option>
+            <option value="2">Unit 2</option>
+            <option value="3">Unit 3</option>
+            <option value="4">Unit 4</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label" for="resStatusFilter">Result Status</label>
+          <select id="resStatusFilter" class="form-control" onchange="filterResultsTable()">
+            <option value="ALL">All Statuses</option>
+            <option value="PASS">Pass Only</option>
+            <option value="FAIL">Fail Only</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding: 0;">
+      {% if results and results|length > 0 %}
+        <div class="table-responsive" style="border: none; border-radius: 0;">
+          <table class="table" id="allResultsTable">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Student Candidate</th>
+                <th>Roll No</th>
+                <th>Div</th>
+                <th>Class</th>
+                <th>Examination Title</th>
+                <th>Unit</th>
+                <th>Marks</th>
+                <th>%</th>
+                <th>Correct</th>
+                <th>Wrong</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Scorecard</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in results %}
+                <tr class="res-row" data-name="{{ r.studentName|lower }}" data-roll="{{ r.rollNumber|lower }}" data-quiz="{{ r.quizTitle|lower }}" data-div="{{ r.division }}" data-unit="{{ r.unitNumber }}" data-status="{{ r.status }}">
+                  <td><strong>#{{ r.rank }}</strong></td>
+                  <td><strong>{{ r.studentName }}</strong></td>
+                  <td>{{ r.rollNumber }}</td>
+                  <td>{{ r.division }}</td>
+                  <td>{{ r.className }}</td>
+                  <td>{{ r.quizTitle }}</td>
+                  <td><span class="badge badge-navy">Unit {{ r.unitNumber }}</span></td>
+                  <td><strong>{{ r.marks }}</strong> / {{ r.totalMarks }}</td>
+                  <td><strong>{{ r.percentage }}%</strong></td>
+                  <td><span style="color: #16a34a; font-weight: 700;">{{ r.correct }}</span></td>
+                  <td><span style="color: #dc2626; font-weight: 700;">{{ r.wrong }}</span></td>
+                  <td>
+                    <span class="badge {% if r.status == 'PASS' %}badge-success{% else %}badge-danger{% endif %}">
+                      {{ r.status }}
+                    </span>
+                  </td>
+                  <td>{{ r.submittedAt|format_date }}</td>
+                  <td>
+                    <a href="{{ url_for('student.student_result_page', attempt_id=r.attemptId) }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                      View
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div style="padding: 48px; text-align: center; color: var(--text-muted);">
+          No examination results recorded yet.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- VIEW 2: OVERALL 60-MARK RANKINGS -->
+<div id="viewOverallRankings" class="hidden">
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h3 class="card-title">Comprehensive 60-Mark Course Leaderboard</h3>
+        <p class="card-desc">Combined aggregate scores across Unit 1, Unit 2, Unit 3, and Unit 4 (15 marks each)</p>
+      </div>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+      {% if overall_rankings and overall_rankings|length > 0 %}
+        <div class="table-responsive" style="border: none; border-radius: 0;">
+          <table class="table" id="overallTable">
+            <thead>
+              <tr>
+                <th>Overall Rank</th>
+                <th>Candidate Name</th>
+                <th>Roll No</th>
+                <th>Div</th>
+                <th>Class</th>
+                <th>Unit 1 (/15)</th>
+                <th>Unit 2 (/15)</th>
+                <th>Unit 3 (/15)</th>
+                <th>Unit 4 (/15)</th>
+                <th>Total (/60)</th>
+                <th>Percentage</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for o in overall_rankings %}
+                <tr>
+                  <td>
+                    {% if o.rank == 1 %}🥇{% elif o.rank == 2 %}🥈{% elif o.rank == 3 %}🥉{% else %}#{{ o.rank }}{% endif %}
+                  </td>
+                  <td><strong>{{ o.student_name }}</strong></td>
+                  <td>{{ o.roll_number }}</td>
+                  <td>{{ o.division }}</td>
+                  <td>{{ o.class_name }}</td>
+                  <td>{{ o.unit1_marks }}</td>
+                  <td>{{ o.unit2_marks }}</td>
+                  <td>{{ o.unit3_marks }}</td>
+                  <td>{{ o.unit4_marks }}</td>
+                  <td><strong style="color: #2563eb; font-size: 15px;">{{ o.total_marks }}</strong> / 60</td>
+                  <td><strong>{{ o.percentage }}%</strong></td>
+                  <td>
+                    <span class="badge {% if o.overall_status == 'Pass' %}badge-success{% elif o.overall_status == 'Incomplete' %}badge-warning{% else %}badge-danger{% endif %}">
+                      {{ o.overall_status }}
+                    </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div style="padding: 48px; text-align: center; color: var(--text-muted);">
+          No aggregate course evaluations available yet.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- VIEW 3: UNIT LEADERBOARDS -->
+<div id="viewUnitRankings" class="hidden">
+  <div class="card" style="margin-bottom: 20px;">
+    <div class="card-body" style="padding: 16px;">
+      <label class="form-label" for="unitQuizSelector">Select Examination Unit Quiz</label>
+      <select id="unitQuizSelector" class="form-control" onchange="loadUnitLeaderboard(this.value)">
+        {% for q in quizzes %}
+          <option value="{{ q.id }}">{{ q.title }} (Unit {{ q.unit_number }}) - {{ q.subject_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Unit Specific Leaderboard</h3>
+      <p class="card-desc">Rankings ordered by marks obtained in the selected examination</p>
+    </div>
+    <div class="card-body" style="padding: 0;">
+      <div class="table-responsive" style="border: none; border-radius: 0;">
+        <table class="table" id="unitLeaderboardTable">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Student Name</th>
+              <th>Roll Number</th>
+              <th>Division</th>
+              <th>Marks Obtained</th>
+              <th>Percentage</th>
+              <th>Status</th>
+              <th>Submission Date</th>
+            </tr>
+          </thead>
+          <tbody id="unitLeaderboardTbody">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentView = 'table';
+
+function switchView(view) {
+  currentView = view;
+  document.getElementById('viewResultsTable').classList.toggle('hidden', view !== 'table');
+  document.getElementById('viewOverallRankings').classList.toggle('hidden', view !== 'overall');
+  document.getElementById('viewUnitRankings').classList.toggle('hidden', view !== 'unit');
+
+  document.querySelectorAll('.view-tab-btn').forEach(b => {
+    b.classList.remove('btn-navy', 'active');
+    b.classList.add('btn-outline-dark');
+  });
+
+  if (view === 'table') document.getElementById('tabResultsTable').classList.add('btn-navy', 'active');
+  if (view === 'overall') document.getElementById('tabOverallRankings').classList.add('btn-navy', 'active');
+  if (view === 'unit') {
+    document.getElementById('tabUnitRankings').classList.add('btn-navy', 'active');
+    const firstQuiz = document.getElementById('unitQuizSelector').value;
+    if (firstQuiz) loadUnitLeaderboard(firstQuiz);
+  }
+}
+
+function filterResultsTable() {
+  const query = document.getElementById('resSearch').value.toLowerCase().trim();
+  const divFilter = document.getElementById('resDivFilter').value;
+  const unitFilter = document.getElementById('resUnitFilter').value;
+  const statusFilter = document.getElementById('resStatusFilter').value;
+
+  const rows = document.querySelectorAll('.res-row');
+  rows.forEach(r => {
+    const textMatch = !query || r.dataset.name.includes(query) || r.dataset.roll.includes(query) || r.dataset.quiz.includes(query);
+    const divMatch = divFilter === 'ALL' || r.dataset.div.toUpperCase() === divFilter;
+    const unitMatch = unitFilter === 'ALL' || r.dataset.unit === unitFilter;
+    const statusMatch = statusFilter === 'ALL' || r.dataset.status === statusFilter;
+
+    if (textMatch && divMatch && unitMatch && statusMatch) {
+      r.style.display = '';
+    } else {
+      r.style.display = 'none';
+    }
+  });
+}
+
+async function loadUnitLeaderboard(quizId) {
+  if (!quizId) return;
+  const tbody = document.getElementById('unitLeaderboardTbody');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748b;">Loading leaderboard...</td></tr>';
+
+  try {
+    const res = await fetch(`/api/admin/results?type=unit-ranking&quizId=${quizId}`);
+    const data = await res.json();
+    if (data.success && data.unitRankings && data.unitRankings.length > 0) {
+      tbody.innerHTML = '';
+      data.unitRankings.forEach((r, idx) => {
+        const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${r.rank}`));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${medal}</strong></td>
+          <td><strong>${r.studentName}</strong></td>
+          <td>${r.rollNumber}</td>
+          <td>${r.division}</td>
+          <td><strong style="color: #2563eb;">${r.marks}</strong> / ${r.totalMarks}</td>
+          <td><strong>${r.percentage}%</strong></td>
+          <td><span class="badge ${r.status === 'PASS' ? 'badge-success' : 'badge-danger'}">${r.status}</span></td>
+          <td>${r.submittedAt ? r.submittedAt.slice(0, 16).replace('T', ' ') : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } else {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 32px; color: #64748b;">No candidate attempts recorded for this unit yet.</td></tr>';
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px; color: #dc2626;">Failed to load unit leaderboard.</td></tr>';
+  }
+}
+
+function exportCurrentViewCsv() {
+  if (currentView === 'table') {
+    const headers = ['Rank', 'Candidate', 'Roll', 'Division', 'Class', 'Quiz Title', 'Unit', 'Marks', 'Total', '%', 'Correct', 'Wrong', 'Status'];
+    const rows = [];
+    document.querySelectorAll('.res-row').forEach(r => {
+      if (r.style.display !== 'none') {
+        const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim().replace(/\s+/g, ' '));
+        rows.push([cells[0], cells[1], cells[2], cells[3], cells[4], cells[5], cells[6], cells[7], '', cells[8], cells[9], cells[10], cells[11]]);
+      }
+    });
+    downloadCsv(`Results_Report_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
+  } else if (currentView === 'overall') {
+    const headers = ['Rank', 'Candidate', 'Roll', 'Div', 'Class', 'Unit 1 (/15)', 'Unit 2 (/15)', 'Unit 3 (/15)', 'Unit 4 (/15)', 'Total (/60)', '%', 'Status'];
+    const rows = [];
+    document.querySelectorAll('#overallTable tbody tr').forEach(r => {
+      const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim().replace(/\s+/g, ' '));
+      rows.push(cells);
+    });
+    downloadCsv(`Overall_60Marks_Leaderboard_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
+  } else {
+    const headers = ['Rank', 'Candidate', 'Roll', 'Division', 'Marks', '%', 'Status', 'Date'];
+    const rows = [];
+    document.querySelectorAll('#unitLeaderboardTbody tr').forEach(r => {
+      const cells = Array.from(r.querySelectorAll('td')).map(c => c.textContent.trim().replace(/\s+/g, ' '));
+      rows.push(cells);
+    });
+    downloadCsv(`Unit_Leaderboard_${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
+  }
+}
+</script>
+{% endblock %}

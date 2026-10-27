@@ -1,0 +1,180 @@
+{% extends "faculty/shell.html" %}
+
+{% block title %}Quiz Management{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; flex-wrap: wrap;">
+  <div>
+    <span class="section-tag">Faculty Portal</span>
+    <h1 style="font-size: 24px; font-weight: 900; color: #0f172a; letter-spacing: -0.01em;">Quiz Management</h1>
+    <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+      Create, edit, publish, and manage online quizzes with flexible question sizes.
+    </p>
+  </div>
+
+  <a href="{{ url_for('quizzes.new_quiz_page') }}" class="btn btn-navy btn-md">
+    <span>➕ Create Quiz</span>
+  </a>
+</div>
+
+<!-- Filters Bar -->
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-body" style="padding: 16px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: flex-end;">
+      <!-- Search -->
+      <div>
+        <label class="form-label" for="searchQuiz">Search Quizzes</label>
+        <input type="text" id="searchQuiz" class="form-control" placeholder="Search by title, topic, or subject..." onkeyup="filterQuizzesTable()">
+      </div>
+
+      <!-- Subject Filter -->
+      <div>
+        <label class="form-label" for="subjectFilter">Filter by Subject</label>
+        <select id="subjectFilter" class="form-control" onchange="filterQuizzesTable()">
+          <option value="ALL">All Subjects</option>
+          {% for sub in subjects %}
+            <option value="{{ sub.id }}">{{ sub.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div>
+        <label class="form-label" for="statusFilter">Publish Status</label>
+        <select id="statusFilter" class="form-control" onchange="filterQuizzesTable()">
+          <option value="ALL">All Statuses</option>
+          <option value="PUBLISHED">Published Only</option>
+          <option value="DRAFT">Draft Only</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quizzes Table -->
+<div class="card">
+  <div class="card-body" style="padding: 0;">
+    {% if quizzes and quizzes|length > 0 %}
+      <div class="table-responsive" style="border: none; border-radius: 0;">
+        <table class="table" id="quizzesTable">
+          <thead>
+            <tr>
+              <th>Quiz Title & Topic</th>
+              <th>Subject</th>
+              <th>Unit</th>
+              <th>Class & Div</th>
+              <th>Questions</th>
+              <th>Duration</th>
+              <th>Total Marks</th>
+              <th>Status</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in quizzes %}
+              <tr class="quiz-row" data-subject-id="{{ q.subject_id }}" data-status="{% if q.is_published %}PUBLISHED{% else %}DRAFT{% endif %}" data-text="{{ q.title|lower }} {{ q.unit_title|lower }} {{ q.subject_name|lower }}">
+                <td>
+                  <div style="font-weight: 800; color: #0f172a;">{{ q.title }}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">{{ q.unit_title or 'Unit Topic' }}</div>
+                </td>
+                <td><span style="font-weight: 600; color: #2563eb;">{{ q.subject_name }}</span></td>
+                <td><span class="badge badge-navy">Unit {{ q.unit_number }}</span></td>
+                <td>{{ q.class_name }} ({{ q.division }})</td>
+                <td>
+                  <strong style="color: #0f172a;">{{ q.question_count }}</strong> Qs
+                </td>
+                <td>{{ q.duration }} Mins</td>
+                <td><strong>{{ q.total_marks }}</strong> Pts</td>
+                <td>
+                  {% if q.is_published %}
+                    <span class="badge badge-success">Published</span>
+                  {% else %}
+                    <span class="badge badge-warning">Draft</span>
+                  {% endif %}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: inline-flex; gap: 6px;">
+                    <!-- Publish Toggle -->
+                    <button type="button" class="btn btn-sm {% if q.is_published %}btn-outline-dark{% else %}btn-success{% endif %}"
+                            onclick="toggleQuizPublish('{{ q.id }}', {{ 'true' if q.is_published else 'false' }})"
+                            title="{% if q.is_published %}Unpublish Quiz{% else %}Publish Quiz to Students{% endif %}">
+                      {% if q.is_published %}Unpublish{% else %}Publish{% endif %}
+                    </button>
+
+                    <!-- Preview -->
+                    <a href="{{ url_for('quizzes.quiz_preview_page', quiz_id=q.id) }}" class="btn btn-sm btn-outline-dark" title="Preview Student Mode">
+                      👁️ Preview
+                    </a>
+
+                    <!-- Manage Questions -->
+                    <a href="{{ url_for('questions.questions_page', quizId=q.id) }}" class="btn btn-sm btn-navy" title="Manage Questions">
+                      ❓ Questions ({{ q.question_count }})
+                    </a>
+
+                    <!-- Delete Quiz -->
+                    <button type="button" class="btn btn-sm btn-danger-outline" onclick="openDeleteQuizModal('{{ q.id }}', '{{ q.title|replace('\'', '\\\'') }}')" title="Delete Quiz">
+                      🗑️
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding: 48px; text-align: center; color: var(--text-muted);">
+        <div style="font-size: 36px; margin-bottom: 12px;">📑</div>
+        <h3 style="font-size: 16px; font-weight: 700; color: #0f172a;">No Quizzes Created Yet</h3>
+        <p style="font-size: 13px; margin: 4px 0 16px;">Create your first unit quiz to start authoring questions and administering online examinations.</p>
+        <a href="{{ url_for('quizzes.new_quiz_page') }}" class="btn btn-navy btn-sm">Create New Quiz →</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Delete Quiz Modal -->
+<div class="modal-overlay" id="deleteQuizModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="card-title" style="color: #dc2626;">Confirm Quiz Deletion</h3>
+      <button type="button" class="modal-close-btn" onclick="closeDeleteQuizModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 13px; line-height: 1.5; color: #334155;">
+        Are you sure you want to permanently delete quiz <strong id="deleteQuizTitle">--</strong>?
+      </p>
+      <div class="alert alert-danger" style="margin-top: 14px;">
+        ⚠️ This action will permanently remove the quiz, its question links, and student examination attempts.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-dark btn-md" onclick="closeDeleteQuizModal()">Cancel</button>
+      <button type="button" class="btn btn-danger btn-md" onclick="confirmDeleteQuiz()">Delete Quiz</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterQuizzesTable() {
+  const query = document.getElementById('searchQuiz').value.toLowerCase().trim();
+  const subFilter = document.getElementById('subjectFilter').value;
+  const statusFilter = document.getElementById('statusFilter').value;
+
+  const rows = document.querySelectorAll('.quiz-row');
+  rows.forEach(r => {
+    const textMatch = !query || r.dataset.text.includes(query);
+    const subMatch = subFilter === 'ALL' || r.dataset.subjectId === subFilter;
+    const statusMatch = statusFilter === 'ALL' || r.dataset.status === statusFilter;
+
+    if (textMatch && subMatch && statusMatch) {
+      r.style.display = '';
+    } else {
+      r.style.display = 'none';
+    }
+  });
+}
+</script>
+{% endblock %}

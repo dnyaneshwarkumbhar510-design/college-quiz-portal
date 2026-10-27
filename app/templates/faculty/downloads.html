@@ -1,0 +1,247 @@
+{% extends 'faculty/shell.html' %}
+
+{% block faculty_content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+  <!-- Title -->
+  <div>
+    <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Official Exports</span>
+    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Institutional Data Export Center</h1>
+    <p class="text-xs text-slate-500 font-medium mt-0.5">
+      Generate filtered class result spreadsheets and overall 60-mark curriculum reports.
+    </p>
+  </div>
+
+  <!-- Filter Selector Card (Section 19) -->
+  <div class="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+    <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5 flex items-center space-x-2">
+      <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+      </svg>
+      <h3 class="text-sm font-bold text-slate-900">Select Course Subject & Division Filter</h3>
+    </div>
+    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Target Subject</label>
+        <select id="downloadSubjectSelect" class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+          {% for sub in subjects %}
+          <option value="{{ sub.id }}">{{ sub.code }} - {{ sub.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Filter by Division</label>
+        <select id="downloadDivisionSelect" class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+          <option value="ALL">All Divisions</option>
+          {% for div in divisions %}
+          <option value="{{ div }}">Division {{ div }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Download Cards Grid (Section 46) -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Card 1: Overall 60-Mark Combined Results -->
+    <div class="bg-blue-50/40 border-2 border-blue-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+      <div>
+        <div class="flex justify-between items-start">
+          <span class="p-2 rounded-lg bg-[#0f2744] text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+          </span>
+          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+            Out of 60 Marks
+          </span>
+        </div>
+        <h3 class="text-base font-bold text-slate-900 mt-3">
+          Overall 60-Mark Comprehensive Results
+        </h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Aggregated results combining Unit 1, Unit 2, Unit 3, and Unit 4 marks per student with total percentage and overall pass/fail status.
+        </p>
+      </div>
+
+      <div class="pt-5">
+        <button type="button"
+                id="btnDownloadOverall"
+                class="btn btn-primary w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download Overall Results CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Card 2: Unit-Wise CSV Downloads -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+      <div>
+        <div class="flex justify-between items-start">
+          <span class="p-2 rounded-lg bg-emerald-600 text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </span>
+          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+            15 Marks Each
+          </span>
+        </div>
+        <h3 class="text-base font-bold text-slate-900 mt-3">
+          Unit-Wise Examination Results
+        </h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Export detailed individual unit results with rank, correct/wrong counts, and submission timestamps.
+        </p>
+      </div>
+
+      <div class="pt-5 space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="downloadUnitCsv(1)" class="btn btn-outline btn-sm text-xs font-semibold">
+            Unit 1 CSV
+          </button>
+          <button type="button" onclick="downloadUnitCsv(2)" class="btn btn-outline btn-sm text-xs font-semibold">
+            Unit 2 CSV
+          </button>
+          <button type="button" onclick="downloadUnitCsv(3)" class="btn btn-outline btn-sm text-xs font-semibold">
+            Unit 3 CSV
+          </button>
+          <button type="button" onclick="downloadUnitCsv(4)" class="btn btn-outline btn-sm text-xs font-semibold">
+            Unit 4 CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function exportToCsv(filename, rows) {
+    const processRow = function (row) {
+      let finalVal = '';
+      for (let j = 0; j < row.length; j++) {
+        let innerValue = row[j] === null || row[j] === undefined ? '' : row[j].toString();
+        let result = innerValue.replace(/"/g, '""');
+        if (result.search(/("|,|\n)/g) >= 0)
+          result = '"' + result + '"';
+        if (j > 0)
+          finalVal += ',';
+        finalVal += result;
+      }
+      return finalVal + '\n';
+    };
+
+    let csvFile = '';
+    for (let i = 0; i < rows.length; i++) {
+      csvFile += processRow(rows[i]);
+    }
+
+    const blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+
+  async function downloadUnitCsv(unitNumber) {
+    const div = document.getElementById('downloadDivisionSelect').value;
+    const url = `/api/admin/results?unitNumber=${unitNumber}${div !== 'ALL' ? `&division=${div}` : ''}`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.success) {
+        alert('Failed to retrieve unit data');
+        return;
+      }
+
+      const headers = [
+        'Rank', 'Student Name', 'Roll Number', 'Division', 'Class', 'Department',
+        'Quiz Name', 'Unit', 'Marks Obtained', 'Total Marks', 'Percentage',
+        'Correct Answers', 'Wrong Answers', 'Unattempted', 'Status', 'Submission Date'
+      ];
+
+      const dataRows = (data.rows || []).map((r, idx) => [
+        idx + 1,
+        r.student_name || r.studentName,
+        r.roll_number || r.rollNumber,
+        r.division,
+        r.class_name || r.className,
+        r.department,
+        r.quiz_title || r.quizTitle,
+        `Unit ${r.unit_number || r.unitNumber}`,
+        r.obtained_marks || r.marks,
+        r.total_marks || r.totalMarks,
+        `${r.percentage}%`,
+        r.correct_count || r.correct,
+        r.wrong_count || r.wrong,
+        r.unattempted_count || r.unattempted,
+        r.status,
+        (r.submitted_at || '').substring(0, 16)
+      ]);
+
+      const fname = `Unit${unitNumber}_Results_${div !== 'ALL' ? `Div${div}_` : ''}${new Date().toISOString().slice(0, 10)}.csv`;
+      exportToCsv(fname, [headers, ...dataRows]);
+    } catch (e) {
+      console.error(e);
+      alert('Error exporting CSV: ' + e.message);
+    }
+  }
+
+  document.getElementById('btnDownloadOverall').addEventListener('click', async function() {
+    const subId = document.getElementById('downloadSubjectSelect').value;
+    const div = document.getElementById('downloadDivisionSelect').value;
+    const url = `/api/admin/results?type=overall-ranking&subjectId=${subId}`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.success) {
+        alert('Failed to retrieve overall data');
+        return;
+      }
+
+      let rows = data.overallRankings || [];
+      if (div !== 'ALL') {
+        rows = rows.filter(r => (r.division || '').toUpperCase() === div.toUpperCase());
+      }
+
+      const headers = [
+        'Overall Rank', 'Student Name', 'Roll Number', 'Division', 'Class', 'Department',
+        'Unit 1 Marks (/15)', 'Unit 2 Marks (/15)', 'Unit 3 Marks (/15)', 'Unit 4 Marks (/15)',
+        'Total Marks (/60)', 'Overall Percentage', 'Overall Status'
+      ];
+
+      const dataRows = rows.map((r, idx) => [
+        idx + 1,
+        r.student_name,
+        r.roll_number,
+        r.division,
+        r.class_name,
+        r.department,
+        r.unit1_marks,
+        r.unit2_marks,
+        r.unit3_marks,
+        r.unit4_marks,
+        r.total_marks,
+        `${r.percentage}%`,
+        r.overall_status
+      ]);
+
+      const fname = `Overall_60Marks_Results_${div !== 'ALL' ? `Div${div}_` : ''}${new Date().toISOString().slice(0, 10)}.csv`;
+      exportToCsv(fname, [headers, ...dataRows]);
+    } catch (e) {
+      console.error(e);
+      alert('Error exporting overall CSV: ' + e.message);
+    }
+  });
+</script>
+{% endblock %}

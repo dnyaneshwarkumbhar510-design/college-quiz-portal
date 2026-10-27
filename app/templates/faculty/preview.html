@@ -1,0 +1,158 @@
+{% extends "faculty/shell.html" %}
+
+{% block title %}Preview Quiz - {{ quiz.title }}{% endblock %}
+
+{% block admin_content %}
+<!-- Preview Notice Banner -->
+<div style="background: #f59e0b; color: #0f172a; padding: 12px 18px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; margin-bottom: 24px; box-shadow: var(--shadow-sm); gap: 12px; flex-wrap: wrap;">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <span>👁️</span>
+    <span>FACULTY PREVIEW MODE — Responses in this mode are purely interactive simulations and not recorded as real examination attempts.</span>
+  </div>
+  <a href="{{ url_for('quizzes.quizzes_page') }}" class="btn btn-sm btn-outline-dark" style="background: #fff; font-weight: 800;">
+    Exit Preview
+  </a>
+</div>
+
+{% if questions and questions|length > 0 %}
+  <div class="exam-work-area" style="margin: 0; padding: 0;">
+    <!-- Question Card -->
+    <div class="question-card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="badge badge-gray" id="prevQCounter">Question 1 of {{ questions|length }}</span>
+        <span id="prevQMarks" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">({{ questions[0].marks }} Mark)</span>
+      </div>
+
+      <div class="question-progress-bar">
+        <div class="question-progress-fill" id="prevQProgressFill" style="width: {{ 100 / questions|length }}%;"></div>
+      </div>
+
+      <h2 class="question-text" id="prevQText">{{ questions[0].question_text }}</h2>
+
+      <!-- MCQ Options -->
+      <div class="mcq-options-list" id="prevOptionsContainer">
+        <!-- Rendered by inline script -->
+      </div>
+
+      <!-- Navigation -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+        <button type="button" id="prevNavPrev" class="btn btn-outline-dark btn-md" onclick="previewGoTo(previewIndex - 1)">
+          ← Previous
+        </button>
+        <button type="button" id="prevNavNext" class="btn btn-navy btn-md" onclick="previewGoTo(previewIndex + 1)">
+          Next Question →
+        </button>
+      </div>
+
+      <!-- Teacher Answer Inspector Bar -->
+      <div style="margin-top: 24px; background: #f8fafc; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 14px; font-size: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <strong style="color: #1e3a8a;">🔍 Faculty Answer Key Inspector:</strong>
+          <span class="badge badge-success" id="inspectorKeyBadge">Key: Option {{ questions[0].correct_answer }}</span>
+        </div>
+        <p style="color: #475569;" id="inspectorExplanation">
+          {{ questions[0].explanation or 'No explanation provided for this question.' }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Palette -->
+    <div class="palette-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+        <h3 style="font-size: 12px; font-weight: 800; text-transform: uppercase;">Questions ({{ questions|length }})</h3>
+        <span class="badge badge-navy">Preview</span>
+      </div>
+
+      <div class="palette-grid" style="margin: 16px 0;">
+        {% for q in questions %}
+          <button type="button" class="palette-btn {% if loop.index0 == 0 %}current{% endif %}" id="pbtn-{{ loop.index0 }}" onclick="previewGoTo({{ loop.index0 }})">
+            {{ loop.index }}
+          </button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="card" style="padding: 48px; text-align: center; color: var(--text-muted);">
+    <p>No questions found in this quiz for preview.</p>
+    <a href="{{ url_for('questions.questions_page', quizId=quiz.id) }}" class="btn btn-navy btn-sm" style="margin-top: 12px;">
+      Add Questions First →
+    </a>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const previewQuestions = {{ questions|tojson }};
+let previewIndex = 0;
+let previewChoices = {};
+
+function previewGoTo(idx) {
+  if (idx < 0 || idx >= previewQuestions.length) return;
+  previewIndex = idx;
+  const q = previewQuestions[idx];
+
+  document.getElementById('prevQCounter').textContent = `Question ${idx + 1} of ${previewQuestions.length}`;
+  document.getElementById('prevQMarks').textContent = `(${q.marks} Mark${q.marks > 1 ? 's' : ''})`;
+  document.getElementById('prevQText').textContent = q.question_text;
+  document.getElementById('prevQProgressFill').style.width = `${Math.round(((idx + 1) / previewQuestions.length) * 100)}%`;
+
+  // Render Options
+  const container = document.getElementById('prevOptionsContainer');
+  container.innerHTML = '';
+  const opts = [
+    { key: 'A', text: q.option_a },
+    { key: 'B', text: q.option_b },
+    { key: 'C', text: q.option_c },
+    { key: 'D', text: q.option_d }
+  ];
+
+  const selected = previewChoices[q.id];
+  opts.forEach(opt => {
+    const isSelected = selected === opt.key;
+    const div = document.createElement('div');
+    div.className = `mcq-option-item ${isSelected ? 'selected' : ''}`;
+    div.onclick = () => {
+      previewChoices[q.id] = opt.key;
+      previewGoTo(previewIndex);
+    };
+    div.innerHTML = `
+      <div class="mcq-key-circle">${opt.key}</div>
+      <div class="mcq-option-text">${opt.text}</div>
+    `;
+    container.appendChild(div);
+  });
+
+  // Buttons
+  document.getElementById('prevNavPrev').disabled = idx === 0;
+  const nextBtn = document.getElementById('prevNavNext');
+  if (idx === previewQuestions.length - 1) {
+    nextBtn.textContent = 'Finish Preview';
+    nextBtn.onclick = () => window.location.href = "{{ url_for('quizzes.quizzes_page') }}";
+  } else {
+    nextBtn.textContent = 'Next Question →';
+    nextBtn.onclick = () => previewGoTo(idx + 1);
+  }
+
+  // Inspector
+  document.getElementById('inspectorKeyBadge').textContent = `Key: Option ${q.correct_answer}`;
+  document.getElementById('inspectorExplanation').textContent = q.explanation || 'No explanation provided for this question.';
+
+  // Palette
+  document.querySelectorAll('.palette-btn').forEach((b, i) => {
+    b.classList.remove('current');
+    if (previewChoices[previewQuestions[i].id]) {
+      b.classList.add('answered');
+    }
+  });
+  document.getElementById(`pbtn-${idx}`)?.classList.add('current');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (previewQuestions.length > 0) {
+    previewGoTo(0);
+  }
+});
+</script>
+{% endblock %}

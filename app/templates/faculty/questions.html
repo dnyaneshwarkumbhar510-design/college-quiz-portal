@@ -1,0 +1,281 @@
+{% extends "faculty/shell.html" %}
+
+{% block title %}Question Management{% endblock %}
+
+{% block admin_content %}
+<!-- Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; flex-wrap: wrap;">
+  <div>
+    <span class="section-tag">Curriculum Management</span>
+    <h1 style="font-size: 24px; font-weight: 900; color: #0f172a; letter-spacing: -0.01em;">Question Authoring & Bank</h1>
+    <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+      Author, update, and organize MCQ examination questions with designated answer keys.
+    </p>
+  </div>
+
+  {% if selected_quiz %}
+    <div style="display: flex; gap: 10px;">
+      <a href="{{ url_for('quizzes.quiz_preview_page', quiz_id=selected_quiz.id) }}" class="btn btn-outline-dark btn-md">
+        <span>👁️ Preview Quiz</span>
+      </a>
+      <button type="button" class="btn btn-navy btn-md" onclick="openAddQuestionModal()">
+        <span>➕ Add Question</span>
+      </button>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Target Quiz Selection Card -->
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-body" style="padding: 16px 20px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: center;">
+      <div>
+        <label class="form-label" for="quizSelector">Select Examination Quiz</label>
+        <select id="quizSelector" class="form-control" onchange="switchQuiz(this.value)">
+          {% for q in quizzes %}
+            <option value="{{ q.id }}" {% if selected_quiz and selected_quiz.id == q.id %}selected{% endif %}>
+              [{{ q.subject_name }}] {{ q.title }} (Unit {{ q.unit_number }}) - {{ q.question_count }} Qs
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if selected_quiz %}
+        <div style="display: flex; gap: 16px; align-items: center; justify-content: flex-end; flex-wrap: wrap;">
+          <div>
+            <span style="font-size: 11px; color: var(--text-muted); display: block;">Questions Count</span>
+            <strong style="font-size: 18px; color: #0f172a;">{{ selected_quiz.question_count }} Qs</strong>
+          </div>
+
+          <div>
+            <span style="font-size: 11px; color: var(--text-muted); display: block;">Total Marks</span>
+            <strong style="font-size: 18px; color: #2563eb;">{{ selected_quiz.total_marks }} Pts</strong>
+          </div>
+
+          <div>
+            <span style="font-size: 11px; color: var(--text-muted); display: block;">Status</span>
+            {% if selected_quiz.is_published %}
+              <span class="badge badge-success">Published</span>
+            {% else %}
+              <span class="badge badge-warning">Draft</span>
+            {% endif %}
+          </div>
+
+          <button type="button" class="btn btn-sm {% if selected_quiz.is_published %}btn-outline-dark{% else %}btn-success{% endif %}"
+                  onclick="toggleQuizPublish('{{ selected_quiz.id }}', {{ 'true' if selected_quiz.is_published else 'false' }})">
+            {% if selected_quiz.is_published %}Unpublish{% else %}Publish Quiz{% endif %}
+          </button>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Search & Questions List -->
+{% if selected_quiz %}
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap;">
+    <h2 style="font-size: 18px; font-weight: 800; color: #0f172a;">
+      Questions in this Quiz ({{ questions|length }})
+    </h2>
+    <input type="text" id="questionSearchInput" class="form-control" placeholder="Search question text..." style="max-width: 260px;" onkeyup="filterQuestions()">
+  </div>
+
+  {% if questions and questions|length > 0 %}
+    <div style="display: flex; flex-direction: column; gap: 16px;" id="questionsContainer">
+      {% for q in questions %}
+        <div class="card question-item-card" data-text="{{ q.question_text|lower }}">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-navy">Q{{ loop.index }}</span>
+              <span class="badge badge-gray">{{ q.marks }} Mark{% if q.marks > 1 %}s{% endif %}</span>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-sm btn-outline-dark" onclick='openEditQuestionModal({{ q|tojson }})'>
+                ✏️ Edit
+              </button>
+              <button type="button" class="btn btn-sm btn-danger-outline" onclick="openDeleteQuestionModal('{{ q.id }}')">
+                🗑️ Delete
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 16px; line-height: 1.4;">
+              {{ q.question_text }}
+            </h3>
+
+            <!-- 4 Options Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px;">
+              <div style="padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid {% if q.correct_answer == 'A' %}#16a34a; background: #f0fdf4; font-weight: 700;{% else %}var(--border-color); background: #fff;{% endif %} font-size: 13px;">
+                <span style="font-weight: 800; color: #475569;">(A)</span> {{ q.option_a }}
+                {% if q.correct_answer == 'A' %}
+                  <span class="badge badge-success" style="float: right;">Key</span>
+                {% endif %}
+              </div>
+
+              <div style="padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid {% if q.correct_answer == 'B' %}#16a34a; background: #f0fdf4; font-weight: 700;{% else %}var(--border-color); background: #fff;{% endif %} font-size: 13px;">
+                <span style="font-weight: 800; color: #475569;">(B)</span> {{ q.option_b }}
+                {% if q.correct_answer == 'B' %}
+                  <span class="badge badge-success" style="float: right;">Key</span>
+                {% endif %}
+              </div>
+
+              <div style="padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid {% if q.correct_answer == 'C' %}#16a34a; background: #f0fdf4; font-weight: 700;{% else %}var(--border-color); background: #fff;{% endif %} font-size: 13px;">
+                <span style="font-weight: 800; color: #475569;">(C)</span> {{ q.option_c }}
+                {% if q.correct_answer == 'C' %}
+                  <span class="badge badge-success" style="float: right;">Key</span>
+                {% endif %}
+              </div>
+
+              <div style="padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid {% if q.correct_answer == 'D' %}#16a34a; background: #f0fdf4; font-weight: 700;{% else %}var(--border-color); background: #fff;{% endif %} font-size: 13px;">
+                <span style="font-weight: 800; color: #475569;">(D)</span> {{ q.option_d }}
+                {% if q.correct_answer == 'D' %}
+                  <span class="badge badge-success" style="float: right;">Key</span>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if q.explanation %}
+              <div style="margin-top: 12px; font-size: 12px; background: #f8fafc; border-left: 3px solid #2563eb; padding: 8px 12px; color: #334155;">
+                <strong>Explanation:</strong> {{ q.explanation }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card" style="padding: 48px; text-align: center; color: var(--text-muted);">
+      <div style="font-size: 36px; margin-bottom: 12px;">❓</div>
+      <h3 style="font-size: 16px; font-weight: 700; color: #0f172a;">No Questions in this Quiz</h3>
+      <p style="font-size: 13px; margin: 4px 0 16px;">This examination unit currently has 0 questions. Add questions before publishing.</p>
+      <button type="button" class="btn btn-navy btn-sm" onclick="openAddQuestionModal()">
+        ➕ Add First Question
+      </button>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="card" style="padding: 48px; text-align: center; color: var(--text-muted);">
+    <p>Please select or create a quiz first.</p>
+  </div>
+{% endif %}
+
+<!-- Question Editor Modal -->
+<div class="modal-overlay" id="questionEditorModal">
+  <div class="modal-card" style="max-width: 680px;">
+    <div class="modal-header">
+      <h3 class="card-title" id="questionModalTitle">Add Question</h3>
+      <button type="button" class="modal-close-btn" onclick="closeQuestionModal()">✕</button>
+    </div>
+
+    <form id="questionForm" onsubmit="handleSaveQuestion(event, '{{ selected_quiz.id if selected_quiz else '' }}')">
+      <div class="modal-body">
+        <div id="questionModalError" class="alert alert-danger hidden"></div>
+        <input type="hidden" id="questionIdInput" name="id">
+
+        <!-- Question Text -->
+        <div class="form-group">
+          <label class="form-label" for="qTextInput">Question Text *</label>
+          <textarea id="qTextInput" class="form-control" rows="3" placeholder="Enter clear, concise question statement..." required></textarea>
+        </div>
+
+        <!-- 4 Options -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="qOptA">Option A *</label>
+            <input type="text" id="qOptA" class="form-control" placeholder="Option A text" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="qOptB">Option B *</label>
+            <input type="text" id="qOptB" class="form-control" placeholder="Option B text" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="qOptC">Option C *</label>
+            <input type="text" id="qOptC" class="form-control" placeholder="Option C text" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="qOptD">Option D *</label>
+            <input type="text" id="qOptD" class="form-control" placeholder="Option D text" required>
+          </div>
+        </div>
+
+        <!-- Key & Marks -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="qCorrectSelect">Correct Answer Key *</label>
+            <select id="qCorrectSelect" class="form-control" required>
+              <option value="A">Option A</option>
+              <option value="B">Option B</option>
+              <option value="C">Option C</option>
+              <option value="D">Option D</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="qMarksInput">Marks (Points) *</label>
+            <input type="number" id="qMarksInput" class="form-control" value="1" min="0.5" max="10" step="0.5" required>
+          </div>
+        </div>
+
+        <!-- Teacher Explanation -->
+        <div class="form-group">
+          <label class="form-label" for="qExplanationInput">Faculty Explanation (Shown to student on scorecard review)</label>
+          <textarea id="qExplanationInput" class="form-control" rows="2" placeholder="Explain the rationale behind this answer..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-dark btn-md" onclick="closeQuestionModal()">Cancel</button>
+        <button type="submit" class="btn btn-navy btn-md">Save Question</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Question Confirmation Modal -->
+<div class="modal-overlay" id="deleteQuestionModal">
+  <div class="modal-card" style="max-width: 440px;">
+    <div class="modal-header">
+      <h3 class="card-title" style="color: #dc2626;">Confirm Question Removal</h3>
+      <button type="button" class="modal-close-btn" onclick="closeDeleteQuestionModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: #334155; line-height: 1.5;">
+        Are you sure you want to remove this question from the quiz?
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-dark btn-md" onclick="closeDeleteQuestionModal()">Cancel</button>
+      <button type="button" class="btn btn-danger btn-md" onclick="confirmDeleteQuestion('{{ selected_quiz.id if selected_quiz else '' }}')">
+        Remove Question
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchQuiz(quizId) {
+  if (quizId) {
+    window.location.href = `/admin/questions?quizId=${quizId}`;
+  }
+}
+
+function filterQuestions() {
+  const query = document.getElementById('questionSearchInput').value.toLowerCase().trim();
+  const cards = document.querySelectorAll('.question-item-card');
+  cards.forEach(c => {
+    if (!query || c.dataset.text.includes(query)) {
+      c.style.display = '';
+    } else {
+      c.style.display = 'none';
+    }
+  });
+}
+</script>
+{% endblock %}

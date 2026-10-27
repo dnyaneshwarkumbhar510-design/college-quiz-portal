@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<div style="max-width: 1280px; margin: 0 auto; padding: 32px 16px;">
+  <!-- Welcome & Profile Banner -->
+  <div style="background: linear-gradient(135deg, #0f2744 0%, #1e3a8a 100%); color: #ffffff; border-radius: var(--radius-xl); padding: 28px; box-shadow: var(--shadow-sm); margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 18px;">
+        <div style="width: 60px; height: 60px; border-radius: var(--radius-lg); background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center; font-size: 30px;">
+          👨‍🎓
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <h1 style="font-size: 22px; font-weight: 800; letter-spacing: -0.01em;">Welcome, {{ student.full_name }}</h1>
+            <span class="badge badge-success">Active Student</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px; margin-top: 10px; font-size: 12px; color: #bfdbfe;">
+            <div>
+              <span style="opacity: 0.75; font-size: 11px; display: block;">Roll Number:</span>
+              <strong style="color: #ffffff; font-size: 14px;">{{ student.roll_number }}</strong>
+            </div>
+            <div>
+              <span style="opacity: 0.75; font-size: 11px; display: block;">Division:</span>
+              <strong style="color: #ffffff; font-size: 14px;">Division {{ student.division }}</strong>
+            </div>
+            <div>
+              <span style="opacity: 0.75; font-size: 11px; display: block;">Class / Year:</span>
+              <strong style="color: #ffffff; font-size: 14px;">{{ student.class_name }}</strong>
+            </div>
+            <div>
+              <span style="opacity: 0.75; font-size: 11px; display: block;">Department:</span>
+              <strong style="color: #ffffff; font-size: 14px;">{{ student.department }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <a href="{{ url_for('student.student_history') }}" class="btn btn-outline" style="font-size: 12px;">
+          <span>📜 View Full History</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Summary Cards Strip -->
+  <div class="stat-cards-grid">
+    <div class="stat-card">
+      <span class="stat-card-title">Quizzes Attempted</span>
+      <div class="stat-card-value">{{ stats.totalAttempted }}</div>
+      <span class="stat-card-desc">Completed evaluations</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-title">Average Score</span>
+      <div class="stat-card-value">{{ stats.avgMarks }}</div>
+      <span class="stat-card-desc">Mean marks across quizzes</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-title">Overall Accuracy</span>
+      <div class="stat-card-value" style="color: #2563eb;">{{ stats.avgPercentage }}%</div>
+      <span class="stat-card-desc">Cumulative percentage</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-card-title">Passed Examinations</span>
+      <div class="stat-card-value" style="color: #16a34a;">{{ stats.passCount }}</div>
+      <span class="stat-card-desc">Min. passing score 40%</span>
+    </div>
+  </div>
+
+  <!-- Quizzes Section Header & Filters -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap;">
+    <div>
+      <h2 style="font-size: 20px; font-weight: 800; color: #0f172a;">Available Unit Examinations</h2>
+      <p style="font-size: 12px; color: var(--text-muted);">Published quizzes available for your continuous assessment</p>
+    </div>
+
+    <!-- Search input -->
+    <div style="max-width: 300px; width: 100%;">
+      <input type="text" id="quizSearchInput" class="form-control" placeholder="Search quizzes by title or topic..." onkeyup="filterQuizzes()">
+    </div>
+  </div>
+
+  <!-- Subject Filter Pills -->
+  <div style="display: flex; gap: 8px; margin-bottom: 24px; overflow-x: auto; padding-bottom: 6px;" id="subjectFilterPills">
+    <button type="button" class="btn btn-sm btn-navy subject-pill active" onclick="filterBySubject('ALL', this)">All Subjects</button>
+    {% for sub in subjects %}
+      <button type="button" class="btn btn-sm btn-outline-dark subject-pill" onclick="filterBySubject('{{ sub.id }}', this)">{{ sub.name }}</button>
+    {% endfor %}
+  </div>
+
+  <!-- Published Quizzes Grid -->
+  {% if publishedQuizzes and publishedQuizzes|length > 0 %}
+    <div class="features-grid" id="quizzesGrid" style="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));">
+      {% for q in publishedQuizzes %}
+        <div class="card quiz-card" data-subject-id="{{ q.subject_id }}" data-title="{{ q.title|lower }} {{ q.unit_title|lower }} {{ q.subject_name|lower }}" style="display: flex; flex-direction: column; justify-content: space-between;">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="badge badge-navy">Unit {{ q.unit_number }}</span>
+            <span style="font-size: 11px; font-weight: 700; color: #2563eb;">{{ q.subject_name }}</span>
+          </div>
+
+          <div class="card-body">
+            <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 6px; line-height: 1.3;">{{ q.title }}</h3>
+            {% if q.unit_title %}
+              <p style="font-size: 12px; font-weight: 600; color: var(--secondary); margin-bottom: 8px;">Topic: {{ q.unit_title }}</p>
+            {% endif %}
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+              {{ q.description or 'Official college unit examination with server-enforced timer.' }}
+            </p>
+
+            <!-- Quiz Parameters Chip Strip -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; background: #f8fafc; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--border-color); font-size: 11px;">
+              <div>
+                <span style="color: var(--text-muted); display: block;">Duration</span>
+                <strong style="color: #0f172a;">{{ q.duration }} Mins</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block;">Questions</span>
+                <strong style="color: #0f172a;">{{ q.question_count }} Qs</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block;">Max Marks</span>
+                <strong style="color: #0f172a;">{{ q.total_marks }} Pts</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center;">
+            {% if q.has_attempted %}
+              <div style="font-size: 11px;">
+                <span class="badge {% if q.attempt_status == 'PASS' %}badge-success{% else %}badge-danger{% endif %}">
+                  {{ q.attempt_status }} ({{ q.obtained_marks }}/{{ q.total_marks }})
+                </span>
+              </div>
+              <a href="{{ url_for('student.student_result_page', attempt_id=q.attempt_id) }}" class="btn btn-sm btn-outline-dark font-bold">
+                View Scorecard →
+              </a>
+            {% else %}
+              <div style="font-size: 11px; color: var(--text-muted);">Not yet attempted</div>
+              <a href="{{ url_for('student.student_quiz_engine', quiz_id=q.id) }}" class="btn btn-sm btn-navy">
+                Start Examination →
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card" style="padding: 48px; text-align: center; color: var(--text-muted);">
+      <div style="font-size: 36px; margin-bottom: 12px;">📑</div>
+      <h3 style="font-size: 16px; font-weight: 700; color: #0f172a;">No Published Quizzes Available</h3>
+      <p style="font-size: 13px; margin-top: 4px;">Faculty has not published examinations for this division yet. Please check back later.</p>
+    </div>
+  {% endif %}
+
+  <!-- Recent Submissions Table -->
+  {% if recentAttempts and recentAttempts|length > 0 %}
+    <div style="margin-top: 48px;">
+      <h3 style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">Recent Examination Submissions</h3>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Examination</th>
+              <th>Unit</th>
+              <th>Score</th>
+              <th>Percentage</th>
+              <th>Status</th>
+              <th>Submission Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in recentAttempts %}
+              <tr>
+                <td><strong>{{ a.quiz.title if a.quiz else 'Unit Examination' }}</strong></td>
+                <td><span class="badge badge-navy">Unit {{ a.quiz.unit_number if a.quiz else 1 }}</span></td>
+                <td><strong>{{ a.obtained_marks }}</strong> / {{ a.total_marks }}</td>
+                <td><strong>{{ a.percentage }}%</strong></td>
+                <td>
+                  <span class="badge {% if a.status == 'PASS' %}badge-success{% else %}badge-danger{% endif %}">
+                    {{ a.status }}
+                  </span>
+                </td>
+                <td>{{ a.submitted_at|format_date }}</td>
+                <td>
+                  <a href="{{ url_for('student.student_result_page', attempt_id=a.id) }}" class="btn btn-sm btn-outline-dark">
+                    Scorecard →
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentSubjectFilter = 'ALL';
+
+function filterBySubject(subId, btn) {
+  currentSubjectFilter = subId;
+  document.querySelectorAll('.subject-pill').forEach(b => {
+    b.classList.remove('btn-navy', 'active');
+    b.classList.add('btn-outline-dark');
+  });
+  btn.classList.remove('btn-outline-dark');
+  btn.classList.add('btn-navy', 'active');
+  filterQuizzes();
+}
+
+function filterQuizzes() {
+  const query = document.getElementById('quizSearchInput').value.toLowerCase().trim();
+  const cards = document.querySelectorAll('.quiz-card');
+
+  cards.forEach(card => {
+    const subMatch = currentSubjectFilter === 'ALL' || card.dataset.subjectId === currentSubjectFilter;
+    const titleMatch = !query || card.dataset.title.includes(query);
+
+    if (subMatch && titleMatch) {
+      card.style.display = 'flex';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+</script>
+{% endblock %}

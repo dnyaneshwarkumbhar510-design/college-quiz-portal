@@ -1,0 +1,216 @@
+{% extends "faculty/shell.html" %}
+
+{% block title %}Create New Quiz{% endblock %}
+
+{% block admin_content %}
+<div style="max-width: 800px; margin: 0 auto;">
+  <div style="margin-bottom: 20px;">
+    <a href="{{ url_for('quizzes.quizzes_page') }}" style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-decoration: none;">
+      ← Back to Quizzes List
+    </a>
+  </div>
+
+  <div class="card" style="box-shadow: var(--shadow-md);">
+    <div class="card-header">
+      <h2 class="card-title">Create New Examination Quiz</h2>
+      <p class="card-desc">Set up examination parameters including subject, unit topic, duration, and evaluation criteria.</p>
+    </div>
+
+    <div class="card-body">
+      <div id="newQuizError" class="alert alert-danger hidden"></div>
+
+      <form id="newQuizForm" onsubmit="handleCreateQuiz(event)">
+        <!-- Title -->
+        <div class="form-group">
+          <label class="form-label" for="title">Quiz Title *</label>
+          <input type="text" id="title" name="title" class="form-control" placeholder="e.g. Data Structures – Unit 1 Examination" required minlength="3">
+        </div>
+
+        <!-- Subject Selection -->
+        <div class="form-group">
+          <label class="form-label" for="subject_id">Subject Course *</label>
+          <div style="display: flex; gap: 8px;">
+            <select id="subject_id" name="subject_id" class="form-control" style="flex: 1;">
+              {% for sub in subjects %}
+                <option value="{{ sub.id }}">{{ sub.name }} ({{ sub.code }})</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="btn btn-outline-dark btn-sm" onclick="toggleCustomSubject()">
+              ➕ New Subject
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Subject Input (hidden by default) -->
+        <div id="customSubjectBox" class="form-group hidden" style="background: #f8fafc; padding: 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-color);">
+          <label class="form-label" for="custom_subject_name">Enter New Subject Name</label>
+          <input type="text" id="custom_subject_name" class="form-control" placeholder="e.g. Artificial Intelligence">
+        </div>
+
+        <!-- Unit Number & Unit Title -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="unit_number">Curriculum Unit Number *</label>
+            <input type="number" id="unit_number" name="unit_number" class="form-control" value="1" min="1" max="10" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="unit_title">Unit Topic / Syllabus Scope *</label>
+            <input type="text" id="unit_title" name="unit_title" class="form-control" placeholder="e.g. Arrays, Stacks & Complexity" required>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label class="form-label" for="description">Quiz Description / Student Instructions</label>
+          <textarea id="description" name="description" class="form-control" rows="2" placeholder="Topics covered, scoring rules, instructions..."></textarea>
+        </div>
+
+        <!-- Class, Division & Department -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="class_name">Class / Academic Year *</label>
+            <input type="text" id="class_name" name="class_name" class="form-control" value="TE Computer" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="division">Target Division</label>
+            <select id="division" name="division" class="form-control">
+              <option value="All">All Divisions</option>
+              {% for div in divisions %}
+                <option value="{{ div }}">Division {{ div }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="department">Department *</label>
+          <input type="text" id="department" name="department" class="form-control" value="Computer Engineering" required>
+        </div>
+
+        <!-- Duration, Total Marks, Passing % -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="duration_minutes">Duration (Minutes) *</label>
+            <input type="number" id="duration_minutes" name="duration_minutes" class="form-control" value="20" min="1" max="300" required>
+            <span class="form-hint">Server-enforced timer</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="total_marks">Target Total Marks</label>
+            <input type="number" id="total_marks" name="total_marks" class="form-control" value="15" min="1" max="100">
+            <span class="form-hint">Updated as questions are added</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="passing_percentage">Passing Percentage (%) *</label>
+            <input type="number" id="passing_percentage" name="passing_percentage" class="form-control" value="40" min="1" max="100" required>
+            <span class="form-hint">Standard criteria: 40%</span>
+          </div>
+        </div>
+
+        <!-- Options: Randomize -->
+        <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin: 20px 0;">
+          <div style="font-weight: 700; font-size: 13px; margin-bottom: 8px; color: #0f172a;">Examination Integrity Options</div>
+          <div style="display: flex; gap: 24px; font-size: 13px; color: #334155; flex-wrap: wrap;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="randomize_questions" name="randomize_questions">
+              <span>Shuffle question order for each student</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="randomize_options" name="randomize_options">
+              <span>Randomize option choices</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+          <a href="{{ url_for('quizzes.quizzes_page') }}" class="btn btn-outline-dark btn-md">Cancel</a>
+          <button type="submit" id="createQuizBtn" class="btn btn-navy btn-md">
+            <span>💾 Save & Proceed to Questions →</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let customSubjectActive = false;
+
+function toggleCustomSubject() {
+  customSubjectActive = !customSubjectActive;
+  const box = document.getElementById('customSubjectBox');
+  if (customSubjectActive) {
+    box.classList.remove('hidden');
+    document.getElementById('custom_subject_name').focus();
+  } else {
+    box.classList.add('hidden');
+  }
+}
+
+async function handleCreateQuiz(e) {
+  e.preventDefault();
+  const btn = document.getElementById('createQuizBtn');
+  const errBox = document.getElementById('newQuizError');
+  errBox.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Saving Quiz Parameters...';
+
+  let subjectId = document.getElementById('subject_id').value;
+  let subjectName = '';
+  
+  if (customSubjectActive) {
+    const customName = document.getElementById('custom_subject_name').value.trim();
+    if (customName) {
+      subjectName = customName;
+      subjectId = null; // Will trigger automatic creation in service
+    }
+  }
+
+  const payload = {
+    title: document.getElementById('title').value.trim(),
+    subject_id: subjectId,
+    subject_name: subjectName,
+    unit_number: parseInt(document.getElementById('unit_number').value, 10) || 1,
+    unit_title: document.getElementById('unit_title').value.trim(),
+    description: document.getElementById('description').value.trim(),
+    class_name: document.getElementById('class_name').value.trim(),
+    division: document.getElementById('division').value,
+    department: document.getElementById('department').value.trim(),
+    duration_minutes: parseInt(document.getElementById('duration_minutes').value, 10) || 20,
+    total_marks: parseFloat(document.getElementById('total_marks').value) || 15.0,
+    passing_percentage: parseFloat(document.getElementById('passing_percentage').value) || 40.0,
+    randomize_questions: document.getElementById('randomize_questions').checked,
+    randomize_options: document.getElementById('randomize_options').checked
+  };
+
+  try {
+    const res = await fetch('/api/admin/quizzes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (data.success && data.quiz) {
+      window.location.href = `/admin/questions?quizId=${data.quiz.id}`;
+    } else {
+      errBox.textContent = data.message || 'Failed to save quiz. Please verify inputs.';
+      errBox.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = '💾 Save & Proceed to Questions →';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network communication failure. Please check your connection.';
+    errBox.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = '💾 Save & Proceed to Questions →';
+  }
+}
+</script>
+{% endblock %}

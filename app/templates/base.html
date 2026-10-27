@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Quiz Management System{% endblock %} - Central College Examination Portal</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <!-- Chart.js & Canvas Confetti for Rich Interactive Visuals -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <!-- jsPDF & AutoTable for Official PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <!-- Institutional Top Strip -->
+  <div class="inst-strip">
+    <div class="inst-strip-inner">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="inst-strip-brand">QUIZ MANAGEMENT SYSTEM</span>
+        <span style="opacity: 0.6;">|</span>
+        <span style="opacity: 0.85;">Central College Online Quiz & Examination Portal</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="inst-status-pill">● Active</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Navigation Header -->
+  <header class="site-header">
+    <div class="navbar-inner">
+      <a href="{{ url_for('home') }}" class="nav-brand">
+        <div class="nav-logo-box">🎓</div>
+        <div class="nav-title-group">
+          <h1>Quiz Management System</h1>
+          <p>Central College Online Quiz & Examination Portal</p>
+        </div>
+      </a>
+
+      <!-- Desktop Nav Links -->
+      <nav class="nav-links">
+        <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">Home</a>
+        
+        {% if current_student %}
+          <a href="{{ url_for('student.student_dashboard') }}" class="nav-link {% if 'dashboard' in request.endpoint %}active{% endif %}">Dashboard</a>
+          <a href="{{ url_for('student.student_history') }}" class="nav-link {% if 'history' in request.endpoint %}active{% endif %}">My Results</a>
+          <span style="color: #64748b; font-size: 13px; font-weight: 600;">{{ current_student.full_name }}</span>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark">Sign Out</a>
+        {% elif current_faculty %}
+          <a href="{{ url_for('faculty.faculty_dashboard') }}" class="faculty-portal-pill">Faculty Portal →</a>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark">Sign Out</a>
+        {% else %}
+          <a href="{{ url_for('auth.student_login_page') }}" class="nav-link {% if 'student_login' in request.endpoint %}active{% endif %}">Student Login</a>
+          <a href="{{ url_for('auth.admin_login_page') }}" class="nav-link {% if 'admin_login' in request.endpoint %}active{% endif %}">Faculty Login</a>
+        {% endif %}
+      </nav>
+
+      <!-- Mobile Nav Hamburger -->
+      <button type="button" class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle Navigation">
+        ☰
+      </button>
+    </div>
+
+    <!-- Mobile Dropdown Menu -->
+    <div id="mobileNavMenu" class="hidden" style="background: #ffffff; border-top: 1px solid var(--border-color); padding: 12px 16px;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+        {% if current_student %}
+          <a href="{{ url_for('student.student_dashboard') }}" class="nav-link">Dashboard</a>
+          <a href="{{ url_for('student.student_history') }}" class="nav-link">My Results</a>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark" style="margin-top: 8px;">Sign Out</a>
+        {% elif current_faculty %}
+          <a href="{{ url_for('faculty.faculty_dashboard') }}" class="faculty-portal-pill" style="display: inline-block; text-align: center;">Faculty Portal</a>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark" style="margin-top: 8px;">Sign Out</a>
+        {% else %}
+          <a href="{{ url_for('auth.student_login_page') }}" class="nav-link">Student Login</a>
+          <a href="{{ url_for('auth.admin_login_page') }}" class="nav-link">Faculty Login</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <!-- Page Content -->
+  <main style="flex: 1;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-col">
+        <div style="display: flex; align-items: center; gap: 8px; color: #ffffff; font-weight: 700; margin-bottom: 12px;">
+          <span style="font-size: 18px;">🎓</span>
+          <span>Quiz Management System</span>
+        </div>
+        <p style="line-height: 1.6; color: #94a3b8; font-size: 12px;">
+          Central College Online Quiz & Examination Portal designed for academic assessments, automated evaluations, and performance tracking.
+        </p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Portal Services</h4>
+        <ul class="footer-links">
+          <li><a href="{{ url_for('auth.student_login_page') }}">Student Login & Quizzes</a></li>
+          <li><a href="{{ url_for('auth.admin_login_page') }}">Faculty / Examiner Login</a></li>
+          {% if current_student %}
+          <li><a href="{{ url_for('student.student_history') }}">My Examination Results</a></li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>System Features</h4>
+        <ul class="footer-links">
+          <li>Real-Time Synchronized Timers</li>
+          <li>Dynamic MCQ Question Formats</li>
+          <li>Instant Automated Evaluation</li>
+          <li>Candidate Answer Key Review</li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Security & Integrity</h4>
+        <div style="background-color: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.7); padding: 12px; border-radius: 8px; font-size: 11px; line-height: 1.5;">
+          🛡️ Examination sessions are strictly protected under institutional guidelines. Submissions are server-timed and verified.
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>© 2026 Quiz Management System. Central College Online Quiz & Examination Portal.</p>
+      <p>Powered by Python Flask & Supabase PostgreSQL</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

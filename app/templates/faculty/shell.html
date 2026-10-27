@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Faculty Portal{% endblock %} - Examination Administration</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body style="background-color: #f1f5f9;">
+  <div class="admin-shell">
+    <!-- Sidebar Overlay for Mobile -->
+    <div id="sidebarOverlay" class="admin-sidebar-overlay hidden"></div>
+
+    <!-- Admin Sidebar -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">🎓</div>
+        <div style="min-width: 0; flex: 1;">
+          <h2 style="font-size: 15px; font-weight: 800; color: #fff; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            Admin Portal
+          </h2>
+          <p style="font-size: 11px; color: #93c5fd;">Examination Authority</p>
+        </div>
+        <button type="button" id="closeSidebarBtn" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; display: none;" class="mobile-only-close">✕</button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="sidebar-section-title">Overview</div>
+        <a href="{{ url_for('faculty.faculty_dashboard') }}" class="sidebar-link {% if request.endpoint == 'faculty.faculty_dashboard' %}active{% endif %}">
+          <span>📊</span>
+          <span>Dashboard</span>
+        </a>
+
+        <div class="sidebar-section-title">Quiz Management</div>
+        <a href="{{ url_for('quizzes.new_quiz_page') }}" class="sidebar-link {% if request.endpoint == 'quizzes.new_quiz_page' %}active{% endif %}">
+          <span>➕</span>
+          <span>Create Quiz</span>
+        </a>
+        <a href="{{ url_for('quizzes.quizzes_page') }}" class="sidebar-link {% if request.endpoint == 'quizzes.quizzes_page' %}active{% endif %}">
+          <span>📑</span>
+          <span>Manage Quizzes</span>
+        </a>
+        <a href="{{ url_for('questions.questions_page') }}" class="sidebar-link {% if 'questions' in request.endpoint %}active{% endif %}">
+          <span>❓</span>
+          <span>Question Bank</span>
+        </a>
+
+        <div class="sidebar-section-title">Students</div>
+        <a href="{{ url_for('faculty.faculty_students') }}" class="sidebar-link {% if request.endpoint == 'faculty.faculty_students' %}active{% endif %}">
+          <span>👥</span>
+          <span>Student Registry</span>
+        </a>
+        <a href="{{ url_for('results.results_page') }}" class="sidebar-link {% if 'results' in request.endpoint %}active{% endif %}">
+          <span>🏆</span>
+          <span>Results & Rankings</span>
+        </a>
+
+        <div class="sidebar-section-title">Institutional Insights</div>
+        <a href="{{ url_for('analytics.analytics_page') }}" class="sidebar-link {% if 'analytics' in request.endpoint %}active{% endif %}">
+          <span>📈</span>
+          <span>Analytics</span>
+        </a>
+        <a href="{{ url_for('faculty.faculty_downloads') }}" class="sidebar-link {% if 'downloads' in request.endpoint %}active{% endif %}">
+          <span>📥</span>
+          <span>Downloads / Reports</span>
+        </a>
+        <a href="{{ url_for('faculty.faculty_settings') }}" class="sidebar-link {% if 'settings' in request.endpoint %}active{% endif %}">
+          <span>⚙️</span>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- Faculty Profile & Logout Footer -->
+      <div class="sidebar-footer">
+        <div class="faculty-profile-snippet">
+          <div class="faculty-avatar">🛡️</div>
+          <div style="min-width: 0; flex: 1;">
+            <p class="faculty-name">Welcome, Faculty</p>
+            <p class="faculty-role">Faculty Portal</p>
+          </div>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-danger-outline" style="width: 100%; font-size: 11px;">
+          <span>🚪 Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Admin Viewport -->
+    <div class="admin-viewport">
+      <!-- Topbar Header -->
+      <header class="admin-topbar">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button type="button" id="openSidebarBtn" class="mobile-nav-toggle" aria-label="Open Sidebar Menu">
+            ☰
+          </button>
+          <div>
+            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
+              Faculty Examination Administration Portal
+            </span>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="badge badge-success">
+            ● Faculty Active
+          </span>
+          <a href="{{ url_for('home') }}" target="_blank" class="btn btn-sm btn-outline-dark" title="View Public Portal">
+            🌐 View Portal
+          </a>
+        </div>
+      </header>
+
+      <!-- Admin Page Content -->
+      <div class="admin-content">
+        {% block admin_content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

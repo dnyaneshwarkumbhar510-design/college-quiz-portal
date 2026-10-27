@@ -1,0 +1,291 @@
+{% extends "faculty/shell.html" %}
+
+{% block title %}Faculty Dashboard{% endblock %}
+
+{% block admin_content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; flex-wrap: wrap;">
+  <div>
+    <span class="section-tag">Central Analytics</span>
+    <h1 style="font-size: 24px; font-weight: 900; color: #0f172a; letter-spacing: -0.01em;">Faculty Examination Dashboard</h1>
+    <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+      Real-time continuous assessment monitoring and student performance analytics
+    </p>
+  </div>
+
+  <!-- Unit Filter Tabs -->
+  <div style="background: #ffffff; padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; gap: 4px; overflow-x: auto;">
+    <a href="{{ url_for('faculty.faculty_dashboard', unit=0) }}" class="btn btn-sm {% if current_unit == 0 %}btn-navy{% else %}btn-outline-dark{% endif %}">All Units</a>
+    <a href="{{ url_for('faculty.faculty_dashboard', unit=1) }}" class="btn btn-sm {% if current_unit == 1 %}btn-navy{% else %}btn-outline-dark{% endif %}">Unit 1</a>
+    <a href="{{ url_for('faculty.faculty_dashboard', unit=2) }}" class="btn btn-sm {% if current_unit == 2 %}btn-navy{% else %}btn-outline-dark{% endif %}">Unit 2</a>
+    <a href="{{ url_for('faculty.faculty_dashboard', unit=3) }}" class="btn btn-sm {% if current_unit == 3 %}btn-navy{% else %}btn-outline-dark{% endif %}">Unit 3</a>
+    <a href="{{ url_for('faculty.faculty_dashboard', unit=4) }}" class="btn btn-sm {% if current_unit == 4 %}btn-navy{% else %}btn-outline-dark{% endif %}">Unit 4</a>
+  </div>
+</div>
+
+<!-- Primary KPI Cards Strip -->
+<div class="stat-cards-grid">
+  <div class="stat-card">
+    <span class="stat-card-title">Total Students</span>
+    <div class="stat-card-value">{{ stats.totalStudents }}</div>
+    <span class="stat-card-desc">Enrolled candidates</span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-card-title">Total Quizzes</span>
+    <div class="stat-card-value">{{ stats.totalQuizzes }}</div>
+    <span class="stat-card-desc">{% if current_unit > 0 %}Unit {{ current_unit }} examinations{% else %}Across syllabus{% endif %}</span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-card-title">Total Attempts</span>
+    <div class="stat-card-value">{{ stats.totalAttempts }}</div>
+    <span class="stat-card-desc">Evaluated submissions</span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-card-title">Class Average</span>
+    <div class="stat-card-value" style="color: #2563eb;">{{ stats.averageClassScore }}%</div>
+    <span class="stat-card-desc">Mean performance score</span>
+  </div>
+</div>
+
+<!-- Secondary Metrics Strip -->
+<div class="stat-cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+  <div class="stat-card">
+    <span class="stat-card-title">Highest Score</span>
+    <div class="stat-card-value" style="color: #16a34a;">{{ stats.highestScore }} Pts</div>
+    <span class="stat-card-desc">Top candidate marks</span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-card-title">Lowest Score</span>
+    <div class="stat-card-value" style="color: #dc2626;">{{ stats.lowestScore }} Pts</div>
+    <span class="stat-card-desc">Minimum recorded marks</span>
+  </div>
+
+  <div class="stat-card">
+    <span class="stat-card-title">Pass Percentage</span>
+    <div class="stat-card-value" style="color: #2563eb;">{{ stats.passPercentage }}%</div>
+    <span class="stat-card-desc">Passing criteria >= 40%</span>
+  </div>
+</div>
+
+<!-- Interactive Analytics Charts Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 24px; margin-bottom: 32px;">
+  <!-- Chart 1: Score Distribution -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Score Range Distribution</h3>
+      <p class="card-desc">Number of students falling into percentage quintiles</p>
+    </div>
+    <div class="card-body">
+      <div style="position: relative; height: 260px;">
+        <canvas id="scoreDistChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 2: Unit Comparison -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Curriculum Unit-Wise Mastery</h3>
+      <p class="card-desc">Average percentage score across curriculum units</p>
+    </div>
+    <div class="card-body">
+      <div style="position: relative; height: 260px;">
+        <canvas id="unitCompChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 3: Pass vs Fail -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Pass vs Fail Outcome Ratio</h3>
+      <p class="card-desc">Overall passing distribution (40% minimum passing standard)</p>
+    </div>
+    <div class="card-body">
+      <div style="position: relative; height: 260px;">
+        <canvas id="passFailChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 4: Accuracy Distribution -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Overall Response Accuracy Breakdown</h3>
+      <p class="card-desc">Aggregated correct, wrong, and unattempted question proportions</p>
+    </div>
+    <div class="card-body">
+      <div style="position: relative; height: 260px;">
+        <canvas id="accuracyChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Submissions Table -->
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h3 class="card-title">Recent Student Submissions</h3>
+      <p class="card-desc">Latest automatically graded candidate examination attempts</p>
+    </div>
+    <a href="{{ url_for('results.results_page') }}" class="btn btn-sm btn-navy">View All Results →</a>
+  </div>
+
+  <div class="card-body" style="padding: 0;">
+    {% if recent_results and recent_results|length > 0 %}
+      <div class="table-responsive" style="border: none; border-radius: 0;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Student Name</th>
+              <th>Roll Number</th>
+              <th>Div</th>
+              <th>Examination</th>
+              <th>Unit</th>
+              <th>Marks</th>
+              <th>Percentage</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in recent_results %}
+              <tr>
+                <td><strong>#{{ r.rank }}</strong></td>
+                <td><strong>{{ r.studentName }}</strong></td>
+                <td>{{ r.rollNumber }}</td>
+                <td>{{ r.division }}</td>
+                <td>{{ r.quizTitle }}</td>
+                <td><span class="badge badge-navy">Unit {{ r.unitNumber }}</span></td>
+                <td><strong>{{ r.marks }}</strong> / {{ r.totalMarks }}</td>
+                <td><strong>{{ r.percentage }}%</strong></td>
+                <td>
+                  <span class="badge {% if r.status == 'PASS' %}badge-success{% else %}badge-danger{% endif %}">
+                    {{ r.status }}
+                  </span>
+                </td>
+                <td>{{ r.submittedAt|format_date }}</td>
+                <td>
+                  <a href="{{ url_for('student.student_result_page', attempt_id=r.attemptId) }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                    View
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding: 32px; text-align: center; color: var(--text-muted);">
+        No student submissions recorded yet. Once students take quizzes, evaluations will stream here automatically.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Chart 1: Score Distribution
+  const distCtx = document.getElementById('scoreDistChart');
+  if (distCtx) {
+    const distData = {{ stats.scoreDistribution|tojson }};
+    new Chart(distCtx, {
+      type: 'bar',
+      data: {
+        labels: distData.map(d => d.range),
+        datasets: [{
+          label: 'Students Count',
+          data: distData.map(d => d.count),
+          backgroundColor: ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#10b981'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+      }
+    });
+  }
+
+  // Chart 2: Unit Comparison
+  const unitCtx = document.getElementById('unitCompChart');
+  if (unitCtx) {
+    const unitData = {{ stats.unitComparison|tojson }};
+    new Chart(unitCtx, {
+      type: 'bar',
+      data: {
+        labels: unitData.map(u => u.unit),
+        datasets: [{
+          label: 'Average Score %',
+          data: unitData.map(u => u.averagePercentage),
+          backgroundColor: '#0f2744',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, max: 100 }
+        }
+      }
+    });
+  }
+
+  // Chart 3: Pass vs Fail Donut
+  const pfCtx = document.getElementById('passFailChart');
+  if (pfCtx) {
+    const pfData = {{ stats.passFailData|tojson }};
+    new Chart(pfCtx, {
+      type: 'doughnut',
+      data: {
+        labels: pfData.map(d => d.name),
+        datasets: [{
+          data: pfData.map(d => d.value),
+          backgroundColor: pfData.map(d => d.color),
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  }
+
+  // Chart 4: Response Accuracy
+  const accCtx = document.getElementById('accuracyChart');
+  if (accCtx) {
+    const accData = {{ stats.correctWrongData|tojson }};
+    new Chart(accCtx, {
+      type: 'pie',
+      data: {
+        labels: accData.map(d => d.name),
+        datasets: [{
+          data: accData.map(d => d.value),
+          backgroundColor: accData.map(d => d.color),
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

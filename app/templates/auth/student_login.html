@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Student Examination Entry{% endblock %}
+
+{% block content %}
+<div style="min-height: calc(100vh - 200px); display: flex; flex-direction: column; justify-content: center; padding: 48px 16px;">
+  <div style="max-w: 480px; width: 100%; margin: 0 auto; text-align: center; margin-bottom: 24px;">
+    <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--radius-md); background: #0f2744; color: #fff; font-size: 24px; margin-bottom: 12px;">
+      🎓
+    </div>
+    <h2 style="font-size: 24px; font-weight: 900; color: #0f172a;">Student Examination Entry</h2>
+    <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+      Enter your candidate particulars to access published quizzes and your performance history.
+    </p>
+  </div>
+
+  <div style="max-width: 520px; width: 100%; margin: 0 auto;">
+    <div class="card" style="box-shadow: var(--shadow-md);">
+      <div class="card-header">
+        <h3 class="card-title">Student Registration & Sign In</h3>
+        <p class="card-desc">Provide your academic details to access online examinations.</p>
+      </div>
+
+      <div class="card-body">
+        <div id="studentLoginError" class="alert alert-danger hidden"></div>
+
+        <form id="studentLoginForm" onsubmit="handleStudentLogin(event)">
+          <!-- Full Name -->
+          <div class="form-group">
+            <label class="form-label" for="full_name">Student Full Name *</label>
+            <input type="text" id="full_name" name="full_name" class="form-control" placeholder="e.g. Dnyaneshwar Kumbhar" required minlength="2">
+          </div>
+
+          <!-- Roll Number & Division -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="roll_number">Roll Number *</label>
+              <input type="text" id="roll_number" name="roll_number" class="form-control" placeholder="e.g. 105" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="division">Division *</label>
+              <select id="division" name="division" class="form-control" required>
+                {% for div in divisions %}
+                  <option value="{{ div }}">{{ div }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <!-- Class & Department -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="class_name">Class / Academic Year *</label>
+              <input type="text" id="class_name" name="class_name" class="form-control" value="TE Computer" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="department">Department *</label>
+              <input type="text" id="department" name="department" class="form-control" value="Computer Engineering" required>
+            </div>
+          </div>
+
+          <!-- Optional Email & Student ID -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="email">Email Address (Optional)</label>
+              <input type="email" id="email" name="email" class="form-control" placeholder="student@college.edu">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="student_id_number">PRN / Student ID (Optional)</label>
+              <input type="text" id="student_id_number" name="student_id_number" class="form-control" placeholder="e.g. EN210105">
+            </div>
+          </div>
+
+          <div style="margin-top: 24px;">
+            <button type="submit" id="studentLoginBtn" class="btn btn-navy btn-lg" style="width: 100%;">
+              <span>Proceed to Examination Portal →</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card-footer" style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);">
+        <a href="{{ url_for('home') }}" style="color: var(--text-muted); text-decoration: none;">← Back to Home</a>
+        <a href="{{ url_for('auth.admin_login_page') }}" style="color: var(--secondary); font-weight: 700; text-decoration: none;">Faculty Login →</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function handleStudentLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('studentLoginBtn');
+  const errBox = document.getElementById('studentLoginError');
+  errBox.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Verifying particulars...';
+
+  const payload = {
+    full_name: document.getElementById('full_name').value.trim(),
+    roll_number: document.getElementById('roll_number').value.trim(),
+    division: document.getElementById('division').value.trim().toUpperCase(),
+    class_name: document.getElementById('class_name').value.trim(),
+    department: document.getElementById('department').value.trim(),
+    email: document.getElementById('email').value.trim() || undefined,
+    student_id_number: document.getElementById('student_id_number').value.trim() || undefined
+  };
+
+  try {
+    const res = await fetch('/api/auth/student-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = "{{ url_for('student.student_dashboard') }}";
+    } else {
+      errBox.textContent = data.message || 'Login failed. Please verify your details.';
+      errBox.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Proceed to Examination Portal →';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network communication failure. Please check your connection.';
+    errBox.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Proceed to Examination Portal →';
+  }
+}
+</script>
+{% endblock %}

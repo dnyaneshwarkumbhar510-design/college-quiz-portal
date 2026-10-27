@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Continuous Assessment & Examination Portal{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+  <div class="hero-badge">
+    <span class="pulse-dot"></span>
+    <span>Central College Online Examination Portal</span>
+  </div>
+
+  <h1 class="hero-title">Quiz Management System</h1>
+  <p class="hero-subtitle">Central College Online Quiz & Examination Portal</p>
+  <p class="hero-desc">
+    A secure online platform for managing and conducting college quizzes and examinations with server-enforced countdown timers and instant automated evaluation.
+  </p>
+
+  <div class="hero-actions">
+    {% if current_student %}
+      <a href="{{ url_for('student.student_dashboard') }}" class="btn btn-lg btn-primary" style="box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);">
+        <span>📖 Go to Student Dashboard →</span>
+      </a>
+    {% elif current_faculty %}
+      <a href="{{ url_for('faculty.faculty_dashboard') }}" class="btn btn-lg btn-primary" style="box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);">
+        <span>🛡️ Open Faculty Admin Portal →</span>
+      </a>
+    {% else %}
+      <a href="{{ url_for('auth.student_login_page') }}" class="btn btn-lg btn-primary" style="box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);">
+        <span>📖 Student Login</span>
+      </a>
+      <a href="{{ url_for('auth.admin_login_page') }}" class="btn btn-lg btn-outline">
+        <span>🛡️ Faculty Login</span>
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="hero-highlights">
+    <div class="hero-highlight-card">
+      <span class="hero-highlight-title">Dynamic</span>
+      <span class="hero-highlight-subtitle">Flexible Questions</span>
+    </div>
+    <div class="hero-highlight-card">
+      <span class="hero-highlight-title">Server Timed</span>
+      <span class="hero-highlight-subtitle">Exam Countdown</span>
+    </div>
+    <div class="hero-highlight-card">
+      <span class="hero-highlight-title">Automated</span>
+      <span class="hero-highlight-subtitle">Instant Evaluation</span>
+    </div>
+    <div class="hero-highlight-card">
+      <span class="hero-highlight-title" style="color: #34d399;">Secure</span>
+      <span class="hero-highlight-subtitle">Role-Based Access</span>
+    </div>
+  </div>
+</section>
+
+<!-- Features Grid Section -->
+<section class="features-section">
+  <div class="section-header">
+    <span class="section-tag">System Capabilities</span>
+    <h2 class="section-title">Engineered for College Examinations & Continuous Assessment</h2>
+    <p class="section-desc">
+      Everything students and faculty need for seamless quiz conduction, evaluation, and record keeping.
+    </p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon-box">⏱️</div>
+      <h3>Online Quizzes</h3>
+      <p>Conduct secure online quizzes with reliable server-enforced countdown timers and intuitive question navigation.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon-box">📑</div>
+      <h3>Faculty Quiz Management</h3>
+      <p>Create, edit, and publish quizzes with flexible question numbers (5, 10, 20, 30, or more) and curriculum unit topics.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon-box">⚡</div>
+      <h3>Automatic Evaluation</h3>
+      <p>Automatically grade student submissions instantly based on official MCQ answer keys with zero manual delay.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon-box">🏆</div>
+      <h3>Instant Results & Review</h3>
+      <p>Students immediately see their scorecard, percentage, and detailed question-wise answer review with faculty explanations.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon-box">🛡️</div>
+      <h3>Secure Authentication</h3>
+      <p>Strict role separation between students and faculty, ensuring high examination integrity and protected management.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon-box">📊</div>
+      <h3>Performance Tracking</h3>
+      <p>View real student results, track attempts over time, and export institutional assessment reports in PDF and CSV.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Examination Scorecard - {{ result.quiz.title if result.quiz else 'Results' }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 1100px; margin: 0 auto; padding: 32px 16px;">
+  <!-- Header / Breadcrumb -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <a href="{{ url_for('student.student_dashboard') }}" style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-decoration: none;">
+        ← Back to Dashboard
+      </a>
+      <h1 style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 4px;">Official Examination Scorecard</h1>
+    </div>
+
+    <!-- Export Actions -->
+    <div style="display: flex; gap: 10px;">
+      <button type="button" class="btn btn-navy btn-sm" onclick="exportResultPdf()">
+        <span>📄 Download PDF Scorecard</span>
+      </button>
+      <button type="button" class="btn btn-outline-dark btn-sm" onclick="exportResultCsv()">
+        <span>📊 Export CSV</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ScoreCard Hero Banner -->
+  <div class="scorecard-banner">
+    <div style="display: inline-block; background: rgba(255, 255, 255, 0.15); padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
+      Unit {{ result.quiz.unit_number if result.quiz else 1 }} Examination • {{ result.quiz.title if result.quiz else 'Assessment' }}
+    </div>
+
+    <!-- Circular Progress Gauge -->
+    <div class="score-gauge-box">
+      <svg class="score-gauge-svg" width="130" height="130" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="42" fill="transparent" stroke="rgba(255,255,255,0.15)" stroke-width="8"></circle>
+        <circle cx="50" cy="50" r="42" fill="transparent" stroke="{% if result.status == 'PASS' %}#34d399{% else %}#f87171{% endif %}" stroke-width="8"
+                stroke-dasharray="264"
+                stroke-dashoffset="{{ 264 - (264 * (result.percentage / 100.0)) }}"
+                stroke-linecap="round"></circle>
+      </svg>
+      <div class="score-gauge-text">
+        <span class="score-gauge-percentage">{{ result.percentage }}%</span>
+        <span style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #bfdbfe;">
+          {{ result.status }}
+        </span>
+      </div>
+    </div>
+
+    <h2 style="font-size: 26px; font-weight: 900; margin-top: 8px;">
+      {% if result.status == 'PASS' %}
+        🎉 Congratulations! You have Passed.
+      {% else %}
+        Assessment Needs Improvement
+      {% endif %}
+    </h2>
+    <p style="font-size: 13px; color: #bfdbfe; margin-top: 4px;">
+      Candidate Score: <strong>{{ result.obtained_marks }}</strong> out of <strong>{{ result.total_marks }}</strong> Marks
+    </p>
+  </div>
+
+  <!-- Student & Examination Particulars Box -->
+  <div class="card" style="margin-bottom: 24px;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 class="card-title" style="font-size: 14px; text-transform: uppercase; color: #475569; letter-spacing: 0.04em;">Candidate & Examination Record</h3>
+      <span class="badge {% if result.status == 'PASS' %}badge-success{% else %}badge-danger{% endif %}">{{ result.status }}</span>
+    </div>
+    <div class="card-body">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; font-size: 13px;">
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Student Name:</span>
+          <strong style="color: #0f172a;">{{ result.student.full_name if result.student else 'Candidate' }}</strong>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Roll Number:</span>
+          <strong style="color: #0f172a;">{{ result.student.roll_number if result.student else '-' }}</strong>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Class & Division:</span>
+          <strong style="color: #0f172a;">{{ result.student.class_name if result.student else '-' }} (Div {{ result.student.division if result.student else 'A' }})</strong>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Department:</span>
+          <strong style="color: #0f172a;">{{ result.student.department if result.student else 'Engineering' }}</strong>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Examination:</span>
+          <strong style="color: #0f172a;">{{ result.quiz.title if result.quiz else 'Unit Exam' }}</strong>
+        </div>
+        <div>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">Submission Timestamp:</span>
+          <strong style="color: #0f172a;">{{ result.submitted_at|format_date }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Highlights Summary Strip -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 32px;">
+    <div class="card" style="padding: 16px; text-align: center;">
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Questions</span>
+      <strong style="font-size: 22px; color: #0f172a; display: block; margin-top: 4px;">{{ result.total_questions }}</strong>
+    </div>
+
+    <div class="card" style="padding: 16px; text-align: center;">
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Attempted</span>
+      <strong style="font-size: 22px; color: #2563eb; display: block; margin-top: 4px;">{{ result.attempted_questions }}</strong>
+    </div>
+
+    <div class="card" style="padding: 16px; text-align: center;">
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Correct</span>
+      <strong style="font-size: 22px; color: #16a34a; display: block; margin-top: 4px;">{{ result.correct_answers }}</strong>
+    </div>
+
+    <div class="card" style="padding: 16px; text-align: center;">
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Wrong</span>
+      <strong style="font-size: 22px; color: #dc2626; display: block; margin-top: 4px;">{{ result.wrong_answers }}</strong>
+    </div>
+
+    <div class="card" style="padding: 16px; text-align: center;">
+      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Unattempted</span>
+      <strong style="font-size: 22px; color: #64748b; display: block; margin-top: 4px;">{{ result.unattempted }}</strong>
+    </div>
+  </div>
+
+  <!-- Detailed Question-Wise Review -->
+  {% if result.reviews and result.reviews|length > 0 %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title" style="font-size: 16px; color: #0f172a;">Question-by-Question Evaluation Breakdown</h3>
+        <p class="card-desc">Comprehensive analysis of your responses compared against official faculty answer keys.</p>
+      </div>
+
+      <div class="card-body" style="padding: 0;">
+        <div class="table-responsive" style="border: none; border-radius: 0;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>Question & Options</th>
+                <th style="width: 110px;">Your Answer</th>
+                <th style="width: 90px;">Key</th>
+                <th style="width: 100px;">Result</th>
+                <th style="width: 80px;">Marks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in result.reviews %}
+                <tr>
+                  <td><strong>Q{{ loop.index }}</strong></td>
+                  <td>
+                    <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">{{ r.question_text }}</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px; font-size: 11px; color: var(--text-muted);">
+                      <span>(A) {{ r.option_a }}</span>
+                      <span>(B) {{ r.option_b }}</span>
+                      <span>(C) {{ r.option_c }}</span>
+                      <span>(D) {{ r.option_d }}</span>
+                    </div>
+                    {% if r.explanation %}
+                      <div style="margin-top: 8px; font-size: 11px; background: #f8fafc; border-left: 3px solid #2563eb; padding: 6px 10px; color: #334155;">
+                        <strong>Explanation:</strong> {{ r.explanation }}
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if r.selected_answer %}
+                      <span class="badge {% if r.is_correct %}badge-success{% else %}badge-danger{% endif %}">
+                        Option {{ r.selected_answer }}
+                      </span>
+                    {% else %}
+                      <span style="color: #94a3b8; font-size: 12px; font-style: italic;">Unattempted</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge badge-navy">Option {{ r.correct_answer }}</span>
+                  </td>
+                  <td>
+                    {% if r.is_correct %}
+                      <span style="color: #16a34a; font-weight: 700; font-size: 12px;">✓ Correct</span>
+                    {% elif r.selected_answer %}
+                      <span style="color: #dc2626; font-weight: 700; font-size: 12px;">✗ Wrong</span>
+                    {% else %}
+                      <span style="color: #94a3b8; font-size: 12px;">— Skipped</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <strong>{{ r.marks_awarded }}</strong> / {{ r.max_marks }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  {% if result.status == 'PASS' %}
+    if (typeof confetti === 'function') {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }
+  {% endif %}
+});
+
+// Client-Side CSV Exporter
+function exportResultCsv() {
+  const headers = [
+    'Student Name', 'Roll Number', 'Division', 'Class', 'Department',
+    'Quiz Name', 'Unit', 'Submission Date', 'Total Marks', 'Obtained Marks',
+    'Percentage', 'Correct Answers', 'Wrong Answers', 'Unattempted', 'Status'
+  ];
+
+  const row = [
+    "{{ result.student.full_name if result.student else 'Candidate' }}",
+    "{{ result.student.roll_number if result.student else '-' }}",
+    "{{ result.student.division if result.student else '-' }}",
+    "{{ result.student.class_name if result.student else '-' }}",
+    "{{ result.student.department if result.student else '-' }}",
+    "{{ result.quiz.title if result.quiz else 'Unit Exam' }}",
+    "Unit {{ result.quiz.unit_number if result.quiz else 1 }}",
+    "{{ result.submitted_at|format_date }}",
+    "{{ result.total_marks }}",
+    "{{ result.obtained_marks }}",
+    "{{ result.percentage }}%",
+    "{{ result.correct_answers }}",
+    "{{ result.wrong_answers }}",
+    "{{ result.unattempted }}",
+    "{{ result.status }}"
+  ];
+
+  downloadCsv("ScoreCard_{{ result.student.roll_number if result.student else 'Candidate' }}.csv", [headers, row]);
+}
+
+// Client-Side Official Scorecard PDF Generator
+function exportResultPdf() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  // Official Institutional Banner
+  doc.setFillColor(15, 39, 68); // #0f2744 Navy
+  doc.rect(0, 0, 210, 32, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CENTRAL COLLEGE OF ENGINEERING & TECHNOLOGY', 105, 14, { align: 'center' });
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Online Quiz & Continuous Assessment Portal • Official Score Card', 105, 22, { align: 'center' });
+
+  // Student & Exam Particulars Box
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(14, 38, 182, 38, 2, 2, 'FD');
+
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CANDIDATE INFORMATION', 18, 45);
+
+  doc.setFont('helvetica', 'normal');
+  doc.text("Candidate: {{ result.student.full_name if result.student else 'Candidate' }}", 18, 52);
+  doc.text("Roll Number: {{ result.student.roll_number if result.student else '-' }}", 18, 58);
+  doc.text("Class & Div: {{ result.student.class_name if result.student else '-' }} (Div {{ result.student.division if result.student else '-' }})", 18, 64);
+  doc.text("Department: {{ result.student.department if result.student else '-' }}", 18, 70);
+
+  doc.text("Examination: {{ result.quiz.title if result.quiz else 'Unit Exam' }}", 115, 52);
+  doc.text("Unit: Unit {{ result.quiz.unit_number if result.quiz else 1 }}", 115, 58);
+  doc.text("Exam Date: {{ result.submitted_at|format_date }}", 115, 64);
+  doc.text("Result Status: {{ result.status }}", 115, 70);
+
+  // Performance Table
+  doc.autoTable({
+    startY: 82,
+    head: [['Metrics', 'Score / Count', 'Metrics', 'Score / Count']],
+    body: [
+      ['Total Questions', "{{ result.total_questions }}", 'Obtained Marks', "{{ result.obtained_marks }} / {{ result.total_marks }}"],
+      ['Attempted', "{{ result.attempted_questions }}", 'Percentage', "{{ result.percentage }}%"],
+      ['Correct Answers', "{{ result.correct_answers }}", 'Passing Standard', "40.00%"],
+      ['Wrong Answers', "{{ result.wrong_answers }}", 'Final Status', "{{ result.status }}"],
+      ['Unattempted', "{{ result.unattempted }}", 'Attempt ID', "{{ result.id[:12] }}"]
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 8.5, textColor: [30, 41, 59] },
+    alternateRowStyles: { fillColor: [248, 250, 252] }
+  });
+
+  // Question Breakdown
+  const finalY = doc.lastAutoTable.finalY || 135;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(15, 39, 68);
+  doc.text('QUESTION-WISE EVALUATION BREAKDOWN', 14, finalY + 10);
+
+  const reviewRows = [
+    {% for r in result.reviews %}
+      [
+        "Q{{ loop.index }}",
+        "{{ r.question_text|replace('"', '\\"')|truncate(60) }}",
+        "{{ r.selected_answer or 'Unattempted' }}",
+        "{{ r.correct_answer }}",
+        "{{ 'Correct' if r.is_correct else ('Wrong' if r.selected_answer else 'Unattempted') }}",
+        "{{ r.marks_awarded }}/{{ r.max_marks }}"
+      ],
+    {% endfor %}
+  ];
+
+  doc.autoTable({
+    startY: finalY + 14,
+    head: [['#', 'Question Text', 'Your Answer', 'Key', 'Result', 'Marks']],
+    body: reviewRows,
+    theme: 'striped',
+    headStyles: { fillColor: [15, 39, 68], textColor: 255, fontSize: 8 },
+    bodyStyles: { fontSize: 7.5 }
+  });
+
+  doc.save("Official_Scorecard_{{ result.student.roll_number if result.student else 'Student' }}.pdf");
+}
+</script>
+{% endblock %}
