@@ -9,20 +9,48 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeBtn = document.getElementById('closeSidebarBtn');
   const overlay = document.getElementById('sidebarOverlay');
 
-  if (openBtn && sidebar) {
-    openBtn.addEventListener('click', () => {
-      sidebar.classList.add('open');
-      overlay?.classList.remove('hidden');
-    });
-  }
-
   const closeSidebar = () => {
     sidebar?.classList.remove('open');
-    overlay?.classList.add('hidden');
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.style.display = 'none';
+    }
   };
 
+  const openSidebar = () => {
+    sidebar?.classList.add('open');
+    if (overlay) {
+      overlay.classList.remove('hidden');
+      overlay.style.display = 'block';
+    }
+  };
+
+  if (openBtn) openBtn.addEventListener('click', openSidebar);
   if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
   if (overlay) overlay.addEventListener('click', closeSidebar);
+
+  // Close drawer when any sidebar navigation link is clicked on mobile
+  document.querySelectorAll('.sidebar-nav a').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        closeSidebar();
+      }
+    });
+  });
+
+  // Close drawer on Escape key press
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeSidebar();
+    }
+  });
+
+  // Automatically close mobile drawer if window is resized to desktop width
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+      closeSidebar();
+    }
+  });
 });
 
 // Toggle Quiz Publish Status

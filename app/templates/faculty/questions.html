@@ -28,7 +28,7 @@
 <!-- Target Quiz Selection Card -->
 <div class="card" style="margin-bottom: 24px;">
   <div class="card-body" style="padding: 16px 20px;">
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: center;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; align-items: center;">
       <div>
         <label class="form-label" for="quizSelector">Select Examination Quiz</label>
         <select id="quizSelector" class="form-control" onchange="switchQuiz(this.value)">

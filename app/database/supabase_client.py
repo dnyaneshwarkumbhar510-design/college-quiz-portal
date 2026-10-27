@@ -29,7 +29,8 @@ def get_db_connection():
     Guarantees permanent disk persistence across server restarts and page refreshes.
     """
     db_path = Config.SQLITE_DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    conn.execute("PRAGMA busy_timeout = 30000;")
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.row_factory = sqlite3.Row
     return conn
@@ -211,6 +212,31 @@ def init_local_schema():
         CONSTRAINT unique_attempt_question UNIQUE (attempt_id, question_id)
     );
     """)
+
+    # Schema compatibility migrations for local SQLite
+    cursor.execute("PRAGMA table_info(questions)")
+    q_cols = [c['name'] for c in cursor.fetchall()]
+    if 'quiz_id' not in q_cols:
+        cursor.execute("ALTER TABLE questions ADD COLUMN quiz_id TEXT;")
+        try:
+            cursor.execute("UPDATE questions SET quiz_id = (SELECT quiz_id FROM quiz_questions WHERE quiz_questions.question_id = questions.id LIMIT 1) WHERE quiz_id IS NULL;")
+        except Exception:
+            pass
+
+    cursor.execute("PRAGMA table_info(quizzes)")
+    qz_cols = [c['name'] for c in cursor.fetchall()]
+    if 'duration_minutes' not in qz_cols:
+        cursor.execute("ALTER TABLE quizzes ADD COLUMN duration_minutes INTEGER DEFAULT 15;")
+        cursor.execute("UPDATE quizzes SET duration_minutes = duration WHERE duration_minutes IS NULL;")
+    if 'question_count' not in qz_cols:
+        cursor.execute("ALTER TABLE quizzes ADD COLUMN question_count INTEGER DEFAULT 0;")
+        cursor.execute("UPDATE quizzes SET question_count = total_questions WHERE question_count IS NULL;")
+    if 'passing_percentage' not in qz_cols:
+        cursor.execute("ALTER TABLE quizzes ADD COLUMN passing_percentage REAL DEFAULT 40.0;")
+        cursor.execute("UPDATE quizzes SET passing_percentage = pass_percentage WHERE passing_percentage IS NULL;")
+    if 'is_published' not in qz_cols:
+        cursor.execute("ALTER TABLE quizzes ADD COLUMN is_published INTEGER DEFAULT 0;")
+        cursor.execute("UPDATE quizzes SET is_published = published WHERE is_published IS NULL;")
 
     # Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_students_roll ON students(roll_number, class_name, division);")

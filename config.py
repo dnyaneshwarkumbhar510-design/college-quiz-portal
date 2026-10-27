@@ -7,9 +7,19 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'college-quiz-portal-secure-secret-key-2026')
     DEBUG = os.environ.get('FLASK_ENV', 'development') == 'development'
     
-    # Supabase Configuration
-    SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
-    SUPABASE_KEY = (os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY', '')).strip()
+    # Supabase Configuration (supports both standard and Next.js / Vercel deployment variables)
+    SUPABASE_URL = (
+        os.environ.get('SUPABASE_URL') or
+        os.environ.get('NEXT_PUBLIC_SUPABASE_URL') or
+        ''
+    ).strip()
+    SUPABASE_KEY = (
+        os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or
+        os.environ.get('SUPABASE_KEY') or
+        os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY') or
+        os.environ.get('SUPABASE_ANON_KEY') or
+        ''
+    ).strip()
     DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 
     # Local SQLite fallback for offline development / verification (uses strict relational foreign keys)

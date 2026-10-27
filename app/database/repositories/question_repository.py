@@ -14,21 +14,19 @@ class QuestionRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
-                # Query authoritative quiz_questions join table
-                res = supabase.table('quiz_questions')\
-                    .select('question_order, questions(*)')\
+                # Query questions directly by quiz_id (authoritative Supabase schema)
+                res = supabase.table('questions')\
+                    .select('*')\
                     .eq('quiz_id', clean_id)\
-                    .order('question_order', desc=False)\
+                    .order('created_at', desc=False)\
                     .execute()
                 
                 rows = []
-                for item in (res.data or []):
-                    q = item.get('questions')
-                    if q:
-                        q_copy = dict(q)
-                        q_copy['quiz_id'] = clean_id
-                        q_copy['question_order'] = item.get('question_order', 1)
-                        rows.append(q_copy)
+                for idx, q in enumerate(res.data or []):
+                    q_copy = dict(q)
+                    q_copy['quiz_id'] = clean_id
+                    q_copy['question_order'] = idx + 1
+                    rows.append(q_copy)
                 return rows
             except Exception as e:
                 logger.error("Supabase get questions for quiz %s error: %s", clean_id, e)
@@ -36,16 +34,36 @@ class QuestionRepository:
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-        SELECT q.*, qq.quiz_id, qq.question_order
-        FROM questions q
-        JOIN quiz_questions qq ON q.id = qq.question_id
-        WHERE qq.quiz_id = ?
-        ORDER BY qq.question_order ASC, q.created_at ASC
-        """, (clean_id,))
-        rows = [dict(r) for r in cursor.fetchall()]
-        conn.close()
-        return rows
+        
+        # Check if quiz_id column exists on questions table
+        cursor.execute("PRAGMA table_info(questions)")
+        q_cols = [c['name'] for c in cursor.fetchall()]
+        
+        if 'quiz_id' in q_cols:
+            cursor.execute("""
+            SELECT * FROM questions
+            WHERE quiz_id = ?
+            ORDER BY created_at ASC
+            """, (clean_id,))
+            rows = []
+            for idx, r in enumerate(cursor.fetchall()):
+                d = dict(r)
+                d['quiz_id'] = clean_id
+                d['question_order'] = idx + 1
+                rows.append(d)
+            conn.close()
+            return rows
+        else:
+            cursor.execute("""
+            SELECT q.*, qq.quiz_id, qq.question_order
+            FROM questions q
+            JOIN quiz_questions qq ON q.id = qq.question_id
+            WHERE qq.quiz_id = ?
+            ORDER BY qq.question_order ASC, q.created_at ASC
+            """, (clean_id,))
+            rows = [dict(r) for r in cursor.fetchall()]
+            conn.close()
+            return rows
 
     get_questions_by_quiz_id = get_by_quiz
 
@@ -105,10 +123,6 @@ class QuestionRepository:
 
     @staticmethod
     def create_question(data):
-        """
-        Creates a question and permanently associates it with the quiz in quiz_questions.
-        Recalculates quiz question count and total marks.
-        """
         clean_quiz_id = str(data['quiz_id']).strip()
         clean_text = str(data['question_text']).strip()
         clean_opt_a = str(data['option_a']).strip()
@@ -135,54 +149,34 @@ class QuestionRepository:
             raise ValueError(f"Target quiz with ID {clean_quiz_id} does not exist in the database.")
 
         question_id = str(uuid.uuid4())
-        join_id = str(uuid.uuid4())
-
-        question_payload = {
-            'id': question_id,
-            'question_text': clean_text,
-            'question_type': 'mcq',
-            'option_a': clean_opt_a,
-            'option_b': clean_opt_b,
-            'option_c': clean_opt_c,
-            'option_d': clean_opt_d,
-            'correct_answer': clean_correct,
-            'marks': clean_marks,
-            'explanation': clean_expl,
-            'created_by': data.get('created_by') or None,
-            'created_at': now,
-            'updated_at': now
-        }
 
         supabase = get_supabase_client()
         if supabase:
+            # Standard Supabase questions payload matching 01_schema.sql
+            supabase_q_payload = {
+                'id': question_id,
+                'quiz_id': clean_quiz_id,
+                'question_text': clean_text,
+                'option_a': clean_opt_a,
+                'option_b': clean_opt_b,
+                'option_c': clean_opt_c,
+                'option_d': clean_opt_d,
+                'correct_answer': clean_correct,
+                'marks': clean_marks,
+                'explanation': clean_expl,
+                'created_at': now
+            }
+
             try:
-                # 1. Insert question into questions table
-                q_res = supabase.table('questions').insert(question_payload).execute()
+                q_res = supabase.table('questions').insert(supabase_q_payload).execute()
                 if not q_res.data or len(q_res.data) == 0:
                     raise RuntimeError("Failed to insert question in Supabase.")
 
-                # 2. Get current question count to determine question_order
-                curr_qq = supabase.table('quiz_questions').select('id', count='exact').eq('quiz_id', clean_quiz_id).execute()
-                order = (curr_qq.count or 0) + 1
-
-                # 3. Insert relational join record into quiz_questions
-                join_payload = {
-                    'id': join_id,
-                    'quiz_id': clean_quiz_id,
-                    'question_id': question_id,
-                    'question_order': order,
-                    'created_at': now
-                }
-                qq_res = supabase.table('quiz_questions').insert(join_payload).execute()
-                if not qq_res.data or len(qq_res.data) == 0:
-                    raise RuntimeError("Failed to create quiz_questions relationship in Supabase.")
-
-                # 4. Recalculate totals on quiz
+                # Recalculate totals on parent quiz
                 QuizRepository.recalculate_totals(clean_quiz_id)
 
                 inserted_q = dict(q_res.data[0])
                 inserted_q['quiz_id'] = clean_quiz_id
-                inserted_q['question_order'] = order
                 return inserted_q
             except Exception as e:
                 logger.error("Supabase create_question error: %s", e)
@@ -191,36 +185,59 @@ class QuestionRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Determine order
-        cursor.execute("SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?", (clean_quiz_id,))
-        order = cursor.fetchone()[0] + 1
+        cursor.execute("PRAGMA table_info(questions)")
+        q_cols = [c['name'] for c in cursor.fetchall()]
+        
+        join_id = str(uuid.uuid4())
+        
+        if 'quiz_id' in q_cols:
+            cursor.execute("""
+            INSERT INTO questions (id, quiz_id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, marks, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                question_id, clean_quiz_id, clean_text,
+                clean_opt_a, clean_opt_b, clean_opt_c, clean_opt_d,
+                clean_correct, clean_expl, clean_marks, now, now
+            ))
+        else:
+            cursor.execute("""
+            INSERT INTO questions (id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, marks, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                question_id, clean_text,
+                clean_opt_a, clean_opt_b, clean_opt_c, clean_opt_d,
+                clean_correct, clean_expl, clean_marks, now, now
+            ))
 
-        # Insert question
-        cursor.execute("""
-        INSERT INTO questions (id, question_text, question_type, option_a, option_b, option_c, option_d, correct_answer, explanation, marks, created_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            question_payload['id'], question_payload['question_text'], question_payload['question_type'],
-            question_payload['option_a'], question_payload['option_b'], question_payload['option_c'],
-            question_payload['option_d'], question_payload['correct_answer'], question_payload['explanation'],
-            question_payload['marks'], question_payload['created_by'], question_payload['created_at'], question_payload['updated_at']
-        ))
-
-        # Insert relationship
-        cursor.execute("""
-        INSERT INTO quiz_questions (id, quiz_id, question_id, question_order, created_at)
-        VALUES (?, ?, ?, ?, ?)
-        """, (join_id, clean_quiz_id, question_id, order, now))
+        # Also insert into quiz_questions join table if table exists
+        try:
+            cursor.execute("SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?", (clean_quiz_id,))
+            order = cursor.fetchone()[0] + 1
+            cursor.execute("""
+            INSERT INTO quiz_questions (id, quiz_id, question_id, question_order, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """, (join_id, clean_quiz_id, question_id, order, now))
+        except Exception:
+            pass
         
         conn.commit()
         conn.close()
 
-        # Recalculate totals
         QuizRepository.recalculate_totals(clean_quiz_id)
 
-        question_payload['quiz_id'] = clean_quiz_id
-        question_payload['question_order'] = order
-        return question_payload
+        return {
+            'id': question_id,
+            'quiz_id': clean_quiz_id,
+            'question_text': clean_text,
+            'option_a': clean_opt_a,
+            'option_b': clean_opt_b,
+            'option_c': clean_opt_c,
+            'option_d': clean_opt_d,
+            'correct_answer': clean_correct,
+            'marks': clean_marks,
+            'explanation': clean_expl,
+            'created_at': now
+        }
 
     @staticmethod
     def update_question(question_id, data):
@@ -236,7 +253,6 @@ class QuestionRepository:
         if 'correct_answer' in data: update_fields['correct_answer'] = str(data['correct_answer']).strip().upper()
         if 'marks' in data: update_fields['marks'] = max(0.5, min(10.0, float(data['marks'])))
         if 'explanation' in data: update_fields['explanation'] = str(data['explanation'] or '').strip() or None
-        update_fields['updated_at'] = now
 
         supabase = get_supabase_client()
         if supabase:
@@ -245,10 +261,10 @@ class QuestionRepository:
                 if not res.data or len(res.data) == 0:
                     raise RuntimeError("Question not found in database.")
 
-                # Recalculate totals for all quizzes using this question
-                qq_res = supabase.table('quiz_questions').select('quiz_id').eq('question_id', clean_id).execute()
-                for row in (qq_res.data or []):
-                    QuizRepository.recalculate_totals(row['quiz_id'])
+                # Recalculate totals for parent quiz
+                updated_q = res.data[0]
+                if updated_q.get('quiz_id'):
+                    QuizRepository.recalculate_totals(updated_q['quiz_id'])
 
                 return QuestionRepository.get_by_id(clean_id)
             except Exception as e:
@@ -258,8 +274,8 @@ class QuestionRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        set_clauses = []
-        params = []
+        set_clauses = ["updated_at = ?"]
+        params = [now]
         for k, v in update_fields.items():
             set_clauses.append(f"{k} = ?")
             params.append(v)
@@ -267,15 +283,16 @@ class QuestionRepository:
 
         cursor.execute(f"UPDATE questions SET {', '.join(set_clauses)} WHERE id = ?", params)
         
-        # Get affected quizzes
-        cursor.execute("SELECT DISTINCT quiz_id FROM quiz_questions WHERE question_id = ?", (clean_id,))
-        quiz_ids = [r[0] for r in cursor.fetchall()]
+        # Get affected quiz
+        cursor.execute("SELECT quiz_id FROM questions WHERE id = ?", (clean_id,))
+        row = cursor.fetchone()
+        quiz_id = row['quiz_id'] if row and 'quiz_id' in row.keys() else None
         
         conn.commit()
         conn.close()
 
-        for qid in quiz_ids:
-            QuizRepository.recalculate_totals(qid)
+        if quiz_id:
+            QuizRepository.recalculate_totals(quiz_id)
 
         return QuestionRepository.get_by_id(clean_id)
 
@@ -287,21 +304,16 @@ class QuestionRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
+                # If quiz_id not provided, look it up first
+                if not clean_quiz_id:
+                    q_res = supabase.table('questions').select('quiz_id').eq('id', clean_qid).maybe_single().execute()
+                    if q_res.data:
+                        clean_quiz_id = q_res.data.get('quiz_id')
+
+                supabase.table('questions').delete().eq('id', clean_qid).execute()
+
                 if clean_quiz_id:
-                    # Remove from this quiz
-                    supabase.table('quiz_questions').delete()\
-                        .eq('quiz_id', clean_quiz_id)\
-                        .eq('question_id', clean_qid)\
-                        .execute()
                     QuizRepository.recalculate_totals(clean_quiz_id)
-                else:
-                    # Find all quizzes
-                    qq = supabase.table('quiz_questions').select('quiz_id').eq('question_id', clean_qid).execute()
-                    quizzes_to_update = [r['quiz_id'] for r in (qq.data or [])]
-                    
-                    supabase.table('questions').delete().eq('id', clean_qid).execute()
-                    for qid in quizzes_to_update:
-                        QuizRepository.recalculate_totals(qid)
                 return True
             except Exception as e:
                 logger.error("Supabase delete_question error: %s", e)
@@ -310,17 +322,27 @@ class QuestionRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        if not clean_quiz_id:
+            cursor.execute("SELECT quiz_id FROM questions WHERE id = ?", (clean_qid,))
+            row = cursor.fetchone()
+            if row and 'quiz_id' in row.keys() and row['quiz_id']:
+                clean_quiz_id = row['quiz_id']
+            else:
+                cursor.execute("SELECT quiz_id FROM quiz_questions WHERE question_id = ?", (clean_qid,))
+                row2 = cursor.fetchone()
+                if row2:
+                    clean_quiz_id = row2[0]
+
+        try:
+            cursor.execute("DELETE FROM quiz_questions WHERE question_id = ?", (clean_qid,))
+        except Exception:
+            pass
+
+        cursor.execute("DELETE FROM questions WHERE id = ?", (clean_qid,))
+        conn.commit()
+        conn.close()
+
         if clean_quiz_id:
-            cursor.execute("DELETE FROM quiz_questions WHERE quiz_id = ? AND question_id = ?", (clean_quiz_id, clean_qid))
-            conn.commit()
-            conn.close()
             QuizRepository.recalculate_totals(clean_quiz_id)
-        else:
-            cursor.execute("SELECT DISTINCT quiz_id FROM quiz_questions WHERE question_id = ?", (clean_qid,))
-            quizzes_to_update = [r[0] for r in cursor.fetchall()]
-            cursor.execute("DELETE FROM questions WHERE id = ?", (clean_qid,))
-            conn.commit()
-            conn.close()
-            for qid in quizzes_to_update:
-                QuizRepository.recalculate_totals(qid)
+
         return True

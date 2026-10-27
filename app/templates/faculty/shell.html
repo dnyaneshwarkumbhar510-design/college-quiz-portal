@@ -11,7 +11,7 @@
 <body style="background-color: #f1f5f9;">
   <div class="admin-shell">
     <!-- Sidebar Overlay for Mobile -->
-    <div id="sidebarOverlay" class="admin-sidebar-overlay hidden"></div>
+    <div id="sidebarOverlay" class="admin-sidebar-overlay hidden" style="display: none;"></div>
 
     <!-- Admin Sidebar -->
     <aside class="admin-sidebar" id="adminSidebar">
@@ -91,13 +91,13 @@
     <div class="admin-viewport">
       <!-- Topbar Header -->
       <header class="admin-topbar">
-        <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="admin-topbar-left">
           <button type="button" id="openSidebarBtn" class="mobile-nav-toggle" aria-label="Open Sidebar Menu">
             ☰
           </button>
-          <div>
-            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
-              Faculty Examination Administration Portal
+          <div class="admin-topbar-title-wrap">
+            <span class="admin-topbar-title">
+              Faculty Examination Administration
             </span>
           </div>
         </div>
