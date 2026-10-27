@@ -21,21 +21,24 @@ class QuizService:
         subject_name = data.get('subject_name') or data.get('subject')
 
         if subject_name and (not subject_id or len(str(subject_id)) < 10):
+            sub_code = (data.get('subject_code') or subject_name[:8]).strip().upper()
             sub = SubjectRepository.get_or_create(
-                code=subject_name[:5].upper(),
-                name=subject_name,
+                code=sub_code,
+                name=subject_name.strip(),
                 department=data.get('department', 'Computer Engineering'),
                 class_name=data.get('class_name', 'TE Computer')
             )
-            data['subject_id'] = sub['id']
-            data['subject_name'] = sub['name']
+            if not sub or not sub.get('id'):
+                raise RuntimeError(f"Could not resolve or create subject record for '{subject_name}'")
+            data['subject_id'] = str(sub['id'])
+            data['subject_name'] = sub.get('name') or subject_name
         elif subject_id:
             # Validate that subject_id actually exists in the active database
             existing_sub = SubjectRepository.get_by_id(subject_id)
             if not existing_sub:
                 all_subs = SubjectRepository.get_all()
                 if all_subs:
-                    data['subject_id'] = all_subs[0]['id']
+                    data['subject_id'] = str(all_subs[0]['id'])
                     data['subject_name'] = all_subs[0]['name']
                 else:
                     sub = SubjectRepository.get_or_create(
@@ -44,14 +47,15 @@ class QuizService:
                         department=data.get('department', 'Computer Engineering'),
                         class_name=data.get('class_name', 'TE Computer')
                     )
-                    data['subject_id'] = sub['id']
+                    data['subject_id'] = str(sub['id'])
                     data['subject_name'] = sub['name']
             else:
+                data['subject_id'] = str(existing_sub['id'])
                 data['subject_name'] = existing_sub.get('name')
         else:
             all_subs = SubjectRepository.get_all()
             if all_subs:
-                data['subject_id'] = all_subs[0]['id']
+                data['subject_id'] = str(all_subs[0]['id'])
                 data['subject_name'] = all_subs[0]['name']
             else:
                 sub = SubjectRepository.get_or_create(
@@ -60,7 +64,7 @@ class QuizService:
                     department=data.get('department', 'Computer Engineering'),
                     class_name=data.get('class_name', 'TE Computer')
                 )
-                data['subject_id'] = sub['id']
+                data['subject_id'] = str(sub['id'])
                 data['subject_name'] = sub['name']
 
         # Ensure unit_number is clamped to valid institutional range [1, 4]
