@@ -1,21 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- =======================================================
+       1. META CONFIGURATION
+  ======================================================== -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  
   <title>{% block title %}Quiz Management System{% endblock %} - Central College Examination Portal</title>
+
+  <!-- =======================================================
+       2. GLOBAL STYLESHEETS
+  ======================================================== -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <!-- Chart.js & Canvas Confetti for Rich Interactive Visuals -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-  <!-- jsPDF & AutoTable for Official PDF Generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Page-Specific Head Content -->
   {% block head %}{% endblock %}
 </head>
 <body>
-  <!-- Institutional Top Strip -->
-  <div class="inst-strip">
+
+  <!-- =======================================================
+       3. TOP INSTITUTIONAL STRIP
+  ======================================================== -->
+  <div class="inst-strip" role="complementary" aria-label="Institution Notice">
     <div class="inst-strip-inner">
       <div style="display: flex; align-items: center; gap: 8px;">
         <span class="inst-strip-brand">QUIZ MANAGEMENT SYSTEM</span>
@@ -27,94 +35,256 @@
       </div>
     </div>
   </div>
+<!-- =======================================================
+     4. PRIMARY NAVIGATION HEADER
+======================================================= -->
+<header class="site-header" role="banner">
 
-  <!-- Main Navigation Header -->
-  <header class="site-header">
-    <div class="navbar-inner">
-      <a href="{{ url_for('home') }}" class="nav-brand">
-        <div class="nav-logo-box">🎓</div>
-        <div class="nav-title-group">
-          <h1>Quiz Management System</h1>
-          <p>Central College Online Quiz & Examination Portal</p>
-        </div>
+  <div class="navbar-inner">
+
+    <!-- Brand -->
+    <a href="{{ url_for('home') }}"
+       class="nav-brand"
+       aria-label="Back to Homepage">
+
+      <div class="nav-logo-box" aria-hidden="true">
+        🎓
+      </div>
+
+      <div class="nav-title-group">
+        <h1>Quiz Management System</h1>
+        <p>Central College Online Quiz & Examination Portal</p>
+      </div>
+
+    </a>
+
+
+    <!-- ==========================================
+         DESKTOP NAVIGATION
+    =========================================== -->
+    <nav class="nav-links" aria-label="Desktop Navigation">
+
+      <a href="{{ url_for('home') }}"
+         class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">
+        Home
       </a>
 
-      <!-- Desktop Nav Links -->
-      <nav class="nav-links">
-        <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">Home</a>
-        <a href="{{ url_for('home') }}#features" class="nav-link">Features</a>
-        <a href="{{ url_for('home') }}#how-it-works" class="nav-link">How It Works</a>
-        
-        {% if current_student %}
-          <a href="{{ url_for('student.student_dashboard') }}" class="nav-link {% if 'dashboard' in request.endpoint %}active{% endif %}">Dashboard</a>
-          <a href="{{ url_for('student.student_history') }}" class="nav-link {% if 'history' in request.endpoint %}active{% endif %}">My Results</a>
-          <span style="color: #64748b; font-size: 13px; font-weight: 600;">{{ current_student.full_name }}</span>
-          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark">Sign Out</a>
-        {% elif current_faculty %}
-          <a href="{{ url_for('faculty.faculty_dashboard') }}" class="faculty-portal-pill">Faculty Portal →</a>
-          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark">Sign Out</a>
-        {% else %}
-          <a href="{{ url_for('auth.student_login_page') }}" class="nav-link {% if 'student_login' in request.endpoint %}active{% endif %}">Student Login</a>
-          <a href="{{ url_for('auth.admin_login_page') }}" class="nav-link {% if 'admin_login' in request.endpoint %}active{% endif %}">Faculty Login</a>
-        {% endif %}
-      </nav>
+      <a href="{{ url_for('home') }}#features"
+         class="nav-link">
+        Features
+      </a>
 
-      <!-- Mobile Nav Hamburger -->
-      <button type="button" class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle Navigation">
-        ☰
-      </button>
-    </div>
+      <a href="{{ url_for('home') }}#how-it-works"
+         class="nav-link">
+        How It Works
+      </a>
 
-    <!-- Mobile Dropdown Menu -->
-    <div id="mobileNavMenu" class="hidden" style="background: #ffffff; border-top: 1px solid var(--border-color); padding: 14px 20px;">
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        <a href="{{ url_for('home') }}" class="nav-link">Home</a>
-        <a href="{{ url_for('home') }}#features" class="nav-link">Features</a>
-        <a href="{{ url_for('home') }}#how-it-works" class="nav-link">How It Works</a>
-        {% if current_student %}
-          <a href="{{ url_for('student.student_dashboard') }}" class="nav-link">Student Dashboard</a>
-          <a href="{{ url_for('student.student_history') }}" class="nav-link">My Results</a>
-          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark" style="margin-top: 8px; text-align: center;">Sign Out</a>
-        {% elif current_faculty %}
-          <a href="{{ url_for('faculty.faculty_dashboard') }}" class="faculty-portal-pill" style="display: inline-block; text-align: center;">Faculty Portal</a>
-          <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-dark" style="margin-top: 8px; text-align: center;">Sign Out</a>
-        {% else %}
-          <a href="{{ url_for('auth.student_login_page') }}" class="btn btn-sm btn-primary" style="text-align: center;">Student Login</a>
-          <a href="{{ url_for('auth.admin_login_page') }}" class="btn btn-sm btn-outline-dark" style="text-align: center;">Faculty Login</a>
-        {% endif %}
+
+      <!-- Student Logged In -->
+      {% if current_student %}
+
+        <a href="{{ url_for('student.student_dashboard') }}"
+           class="nav-link {% if 'dashboard' in (request.endpoint or '') %}active{% endif %}">
+          Dashboard
+        </a>
+
+        <a href="{{ url_for('student.student_history') }}"
+           class="nav-link {% if 'history' in (request.endpoint or '') %}active{% endif %}">
+          My Results
+        </a>
+
+        <span class="nav-user-name">
+          {{ current_student.full_name }}
+        </span>
+
+        <a href="{{ url_for('auth.logout') }}"
+           class="nav-signout">
+          Sign Out
+        </a>
+
+
+      <!-- Faculty Logged In -->
+      {% elif current_faculty %}
+
+        <a href="{{ url_for('faculty.faculty_dashboard') }}"
+           class="faculty-portal-pill">
+          Faculty Portal →
+        </a>
+
+        <a href="{{ url_for('auth.logout') }}"
+           class="nav-signout">
+          Sign Out
+        </a>
+
+
+      <!-- Guest -->
+      {% else %}
+
+        <a href="{{ url_for('auth.student_login_page') }}"
+           class="nav-link {% if 'student_login' in (request.endpoint or '') %}active{% endif %}">
+          Student Login
+        </a>
+
+        <a href="{{ url_for('auth.admin_login_page') }}"
+           class="faculty-portal-pill">
+          Faculty Login
+        </a>
+
+      {% endif %}
+
+    </nav>
+
+
+    <!-- ==========================================
+         MOBILE HAMBURGER
+    =========================================== -->
+    <button
+      type="button"
+      class="mobile-nav-toggle"
+      id="mobileNavToggle"
+      aria-label="Open navigation menu"
+      aria-controls="mobileNavMenu"
+      aria-expanded="false">
+
+      <span class="hamburger-icon">☰</span>
+
+    </button>
+
+  </div>
+
+
+  <!-- ==========================================
+       MOBILE NAVIGATION MENU
+  =========================================== -->
+  <div id="mobileNavMenu" class="mobile-nav-menu">
+
+    <nav class="mobile-nav-links" aria-label="Mobile Navigation">
+
+      <a href="{{ url_for('home') }}"
+         class="mobile-nav-link">
+        Home
+      </a>
+
+      <a href="{{ url_for('home') }}#features"
+         class="mobile-nav-link">
+        Features
+      </a>
+
+      <a href="{{ url_for('home') }}#how-it-works"
+         class="mobile-nav-link">
+        How It Works
+      </a>
+
+
+      <!-- Student Logged In -->
+      {% if current_student %}
+
+        <a href="{{ url_for('student.student_dashboard') }}"
+           class="mobile-nav-link">
+          Dashboard
+        </a>
+
+        <a href="{{ url_for('student.student_history') }}"
+           class="mobile-nav-link">
+          My Results
+        </a>
+
+        <div class="mobile-user-name">
+          {{ current_student.full_name }}
+        </div>
+
+        <a href="{{ url_for('auth.logout') }}"
+           class="mobile-signout">
+          Sign Out
+        </a>
+
+
+      <!-- Faculty Logged In -->
+      {% elif current_faculty %}
+
+        <a href="{{ url_for('faculty.faculty_dashboard') }}"
+           class="mobile-faculty-link">
+          Faculty Portal →
+        </a>
+
+        <a href="{{ url_for('auth.logout') }}"
+           class="mobile-signout">
+          Sign Out
+        </a>
+
+
+      <!-- Guest -->
+      {% else %}
+
+        <a href="{{ url_for('auth.student_login_page') }}"
+           class="mobile-login student">
+          Student Login
+        </a>
+
+        <a href="{{ url_for('auth.admin_login_page') }}"
+           class="mobile-login faculty">
+          Faculty Login
+        </a>
+
+      {% endif %}
+
+    </nav>
+
+  </div>
+
+</header>
+  <!-- =======================================================
+       5. FLASH MESSAGES & ALERTS (Standard Flask Pattern)
+  ======================================================== -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages-container" style="max-width: 1200px; margin: 16px auto 0; padding: 0 16px;">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category if category != 'message' else 'info' }}" role="alert" style="margin-bottom: 8px;">
+            {{ message }}
+          </div>
+        {% endfor %}
       </div>
-    </div>
-  </header>
+    {% endif %}
+  {% endwith %}
 
-  <!-- Page Content -->
-  <main style="flex: 1;">
+  <!-- =======================================================
+       6. MAIN PAGE CONTENT INJECTION
+  ======================================================== -->
+  <main style="flex: 1;" role="main">
     {% block content %}{% endblock %}
   </main>
 
-  <!-- Footer -->
-  <footer class="site-footer">
+  <!-- =======================================================
+       7. SITE FOOTER
+  ======================================================== -->
+  <footer class="site-footer" role="contentinfo">
     <div class="footer-inner">
+      
+      <!-- Brand & Summary -->
       <div class="footer-col">
         <div style="display: flex; align-items: center; gap: 8px; color: #ffffff; font-weight: 700; margin-bottom: 12px;">
-          <span style="font-size: 18px;">🎓</span>
+          <span style="font-size: 18px;" aria-hidden="true">🎓</span>
           <span>Quiz Management System</span>
         </div>
         <p style="line-height: 1.6; color: #94a3b8; font-size: 12px;">
-          Central College Online Quiz & Examination Portal designed for academic assessments, automated evaluations, and performance tracking.
+          Central College Online Quiz &amp; Examination Portal designed for academic assessments, automated evaluations, and performance tracking.
         </p>
       </div>
 
+      <!-- Quick Links -->
       <div class="footer-col">
         <h4>Portal Services</h4>
         <ul class="footer-links">
-          <li><a href="{{ url_for('auth.student_login_page') }}">Student Login & Quizzes</a></li>
+          <li><a href="{{ url_for('auth.student_login_page') }}">Student Login &amp; Quizzes</a></li>
           <li><a href="{{ url_for('auth.admin_login_page') }}">Faculty / Examiner Login</a></li>
           {% if current_student %}
-          <li><a href="{{ url_for('student.student_history') }}">My Examination Results</a></li>
+            <li><a href="{{ url_for('student.student_history') }}">My Examination Results</a></li>
           {% endif %}
         </ul>
       </div>
 
+      <!-- Features Column -->
       <div class="footer-col">
         <h4>System Features</h4>
         <ul class="footer-links">
@@ -125,21 +295,37 @@
         </ul>
       </div>
 
+      <!-- Security Notice -->
       <div class="footer-col">
-        <h4>Security & Integrity</h4>
-        <div style="background-color: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.7); padding: 12px; border-radius: 8px; font-size: 11px; line-height: 1.5;">
+        <h4>Security &amp; Integrity</h4>
+        <div style="background-color: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.7); padding: 12px; border-radius: 8px; font-size: 11px; line-height: 1.5; color: #e2e8f0;">
           🛡️ Examination sessions are strictly protected under institutional guidelines. Submissions are server-timed and verified.
         </div>
       </div>
     </div>
 
+    <!-- Footer Bottom Copyright -->
     <div class="footer-bottom">
-      <p>© 2026 Quiz Management System. Central College Online Quiz & Examination Portal.</p>
-      <p>Powered by Python Flask & Supabase PostgreSQL</p>
+      <p>&copy; 2026 Quiz Management System. Central College Online Quiz &amp; Examination Portal.</p>
+      <p>Powered by Python Flask &amp; Supabase PostgreSQL</p>
     </div>
   </footer>
 
+  <!-- =======================================================
+       8. GLOBAL JAVASCRIPT & THIRD-PARTY CDNs
+  ======================================================== -->
+  <!-- Chart.js & Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <!-- jsPDF & AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Main Application Script -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+  <!-- Page-Specific Injected Scripts -->
   {% block scripts %}{% endblock %}
 </body>
 </html>

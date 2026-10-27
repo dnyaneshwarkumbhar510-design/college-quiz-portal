@@ -1395,3 +1395,629 @@ table {
     padding: 8px 12px;
   }
 }
+
+/* =========================================================
+   FINAL QUIZ MANAGEMENT SYSTEM NAVBAR
+   ========================================================= */
+
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+
+    width: 100%;
+
+    background: #ffffff;
+
+    border-bottom: 1px solid #e2e8f0;
+
+    box-shadow: 0 2px 10px rgba(15, 39, 68, 0.06);
+}
+
+
+/* =========================================================
+   NAVBAR INNER
+   ========================================================= */
+
+.navbar-inner {
+    width: 100%;
+    max-width: 1280px;
+
+    height: 68px;
+
+    margin: 0 auto;
+    padding: 0 20px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 20px;
+}
+
+
+/* =========================================================
+   BRAND
+   ========================================================= */
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+
+    gap: 11px;
+
+    min-width: 0;
+
+    flex-shrink: 1;
+
+    text-decoration: none;
+}
+
+
+.nav-logo-box {
+    width: 42px;
+    height: 42px;
+
+    flex: 0 0 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #0f2744;
+
+    border-radius: 9px;
+
+    font-size: 21px;
+}
+
+
+.nav-title-group {
+    min-width: 0;
+}
+
+
+.nav-title-group h1 {
+    margin: 0;
+
+    color: #0f2744;
+
+    font-size: 17px;
+    font-weight: 700;
+
+    line-height: 1.2;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.nav-title-group p {
+    margin: 3px 0 0;
+
+    color: #64748b;
+
+    font-size: 10.5px;
+    font-weight: 500;
+
+    line-height: 1.2;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   DESKTOP NAVIGATION
+   ========================================================= */
+
+.nav-links {
+    margin-left: auto;
+
+    display: flex;
+    align-items: center;
+
+    gap: 5px;
+
+    min-width: 0;
+}
+
+
+.nav-link {
+    position: relative;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 40px;
+
+    padding: 0 10px;
+
+    color: #475569;
+
+    text-decoration: none;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    white-space: nowrap;
+
+    border-radius: 7px;
+
+    transition: 0.2s ease;
+}
+
+
+.nav-link:hover {
+    color: #2563eb;
+    background: #f8fafc;
+}
+
+
+.nav-link.active {
+    color: #2563eb;
+}
+
+
+.nav-link.active::after {
+    content: "";
+
+    position: absolute;
+
+    left: 10px;
+    right: 10px;
+    bottom: 2px;
+
+    height: 2px;
+
+    background: #2563eb;
+
+    border-radius: 2px;
+}
+
+
+/* =========================================================
+   FACULTY LOGIN / PORTAL
+   ========================================================= */
+
+.faculty-portal-pill {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-height: 38px;
+
+    padding: 0 14px;
+
+    color: #ffffff !important;
+
+    background: #0f2744;
+
+    border: 1px solid #0f2744;
+
+    border-radius: 7px;
+
+    text-decoration: none;
+
+    font-size: 12.5px;
+    font-weight: 600;
+
+    white-space: nowrap;
+
+    transition: 0.2s ease;
+}
+
+
+.faculty-portal-pill:hover {
+    background: #163a63;
+}
+
+
+/* =========================================================
+   USER NAME
+   ========================================================= */
+
+.nav-user-name {
+    max-width: 150px;
+
+    padding: 0 8px;
+
+    color: #64748b;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   SIGN OUT
+   ========================================================= */
+
+.nav-signout {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-height: 36px;
+
+    padding: 0 12px;
+
+    color: #334155;
+
+    background: #ffffff;
+
+    border: 1px solid #cbd5e1;
+
+    border-radius: 7px;
+
+    text-decoration: none;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    white-space: nowrap;
+
+    transition: 0.2s ease;
+}
+
+
+.nav-signout:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+
+/* =========================================================
+   MOBILE HAMBURGER
+   ========================================================= */
+
+.mobile-nav-toggle {
+    display: none;
+
+    width: 42px;
+    height: 42px;
+
+    margin-left: auto;
+
+    align-items: center;
+    justify-content: center;
+
+    color: #0f2744;
+
+    background: #ffffff;
+
+    border: 1px solid #cbd5e1;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    font-size: 22px;
+
+    line-height: 1;
+}
+
+
+.mobile-nav-toggle:hover {
+    background: #f8fafc;
+}
+
+
+.hamburger-icon {
+    display: block;
+}
+
+
+/* =========================================================
+   MOBILE MENU
+   ========================================================= */
+
+.mobile-nav-menu {
+    display: none;
+
+    width: 100%;
+
+    background: #ffffff;
+
+    border-top: 1px solid #e2e8f0;
+
+    box-shadow: 0 8px 18px rgba(15, 39, 68, 0.08);
+}
+
+
+.mobile-nav-menu.open {
+    display: block;
+}
+
+
+.mobile-nav-links {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    max-width: 1280px;
+
+    margin: 0 auto;
+
+    padding: 12px 20px 16px;
+}
+
+
+/* =========================================================
+   MOBILE LINKS
+   ========================================================= */
+
+.mobile-nav-link {
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+
+    min-height: 44px;
+
+    padding: 0 14px;
+
+    color: #334155;
+
+    background: #ffffff;
+
+    text-decoration: none;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    border-radius: 7px;
+
+    transition: 0.2s ease;
+}
+
+
+.mobile-nav-link:hover {
+    color: #2563eb;
+
+    background: #f8fafc;
+}
+
+
+/* =========================================================
+   MOBILE USER
+   ========================================================= */
+
+.mobile-user-name {
+    padding: 10px 14px;
+
+    color: #64748b;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    border-top: 1px solid #e2e8f0;
+
+    margin-top: 5px;
+}
+
+
+/* =========================================================
+   MOBILE BUTTONS
+   ========================================================= */
+
+.mobile-login,
+.mobile-faculty-link,
+.mobile-signout {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-height: 42px;
+
+    padding: 0 14px;
+
+    border-radius: 7px;
+
+    text-decoration: none;
+
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+.mobile-login.student {
+    color: #ffffff;
+
+    background: #2563eb;
+
+    border: 1px solid #2563eb;
+}
+
+
+.mobile-login.faculty {
+    color: #334155;
+
+    background: #ffffff;
+
+    border: 1px solid #cbd5e1;
+}
+
+
+.mobile-faculty-link {
+    color: #ffffff;
+
+    background: #0f2744;
+
+    border: 1px solid #0f2744;
+}
+
+
+.mobile-signout {
+    color: #334155;
+
+    background: #ffffff;
+
+    border: 1px solid #cbd5e1;
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+    .navbar-inner {
+        padding: 0 16px;
+    }
+
+    .nav-links {
+        gap: 2px;
+    }
+
+    .nav-link {
+        padding: 0 7px;
+
+        font-size: 12px;
+    }
+
+    .faculty-portal-pill {
+        padding: 0 10px;
+
+        font-size: 12px;
+    }
+
+    .nav-title-group p {
+        display: none;
+    }
+}
+
+
+/* =========================================================
+   MOBILE <= 768px
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    .site-header {
+        padding: 0;
+    }
+
+    .navbar-inner {
+        height: 64px;
+
+        padding: 0 14px;
+    }
+
+    .nav-links {
+        display: none !important;
+    }
+
+    .mobile-nav-toggle {
+        display: flex;
+    }
+
+    .nav-logo-box {
+        width: 38px;
+        height: 38px;
+
+        flex-basis: 38px;
+
+        font-size: 19px;
+    }
+
+    .nav-title-group h1 {
+        font-size: 15px;
+    }
+
+    .nav-title-group p {
+        display: block;
+
+        max-width: 250px;
+
+        font-size: 9px;
+    }
+}
+
+
+/* =========================================================
+   SMALL MOBILE <= 480px
+   ========================================================= */
+
+@media (max-width: 480px) {
+
+    .navbar-inner {
+        height: 60px;
+
+        padding: 0 12px;
+    }
+
+    .nav-brand {
+        gap: 8px;
+    }
+
+    .nav-logo-box {
+        width: 36px;
+        height: 36px;
+
+        flex-basis: 36px;
+
+        font-size: 17px;
+    }
+
+    .nav-title-group h1 {
+        font-size: 14px;
+    }
+
+    .nav-title-group p {
+        max-width: 190px;
+
+        font-size: 8.5px;
+    }
+
+    .mobile-nav-toggle {
+        width: 38px;
+        height: 38px;
+
+        flex-basis: 38px;
+
+        font-size: 20px;
+    }
+
+    .mobile-nav-links {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+}
+
+
+/* =========================================================
+   VERY SMALL MOBILE <= 340px
+   ========================================================= */
+
+@media (max-width: 340px) {
+
+    .nav-title-group p {
+        display: none;
+    }
+
+    .nav-title-group h1 {
+        font-size: 13px;
+    }
+
+    .nav-logo-box {
+        width: 34px;
+        height: 34px;
+
+        flex-basis: 34px;
+    }
+}
