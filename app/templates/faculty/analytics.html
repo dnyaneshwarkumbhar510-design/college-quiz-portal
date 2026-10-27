@@ -8,7 +8,7 @@
       <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Deep Metrics</span>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight">Performance Analytics Dashboard</h1>
       <p class="text-xs text-slate-500 font-medium mt-0.5">
-        Statistical distribution, curriculum unit comparisons, and passing ratios.
+        Live statistical distribution, curriculum unit comparisons, and passing ratios computed from verified database attempts.
       </p>
     </div>
 
@@ -27,48 +27,86 @@
     </div>
   </div>
 
-  <!-- Primary KPI Strip -->
+  <!-- Primary Statistical KPI Grid -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
       <span class="block text-xs font-bold text-slate-500 uppercase">Class Average</span>
-      <span class="text-2xl font-black text-slate-900 mt-1 block">{{ stats.average_score }}%</span>
-      <span class="text-[11px] text-slate-400">Target Standard: 60%</span>
+      <span class="text-2xl font-black text-slate-900 mt-1 block">
+        {% if stats.total_attempts > 0 %}{{ stats.average_score }}%{% else %}N/A{% endif %}
+      </span>
+      <span class="text-[11px] text-slate-400">Institutional Passing Standard: 40%</span>
     </div>
+
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="block text-xs font-bold text-slate-500 uppercase">Pass Rate</span>
-      <span class="text-2xl font-black text-emerald-600 mt-1 block">{{ stats.pass_rate }}%</span>
-      <span class="text-[11px] text-slate-400">Min passing: 40%</span>
+      <span class="block text-xs font-bold text-slate-500 uppercase">Pass / Fail Ratio</span>
+      <span class="text-2xl font-black text-emerald-600 mt-1 block">
+        {% if stats.total_attempts > 0 %}
+          {{ stats.pass_percentage }}% <span class="text-xs font-bold text-red-500">/ {{ stats.fail_percentage }}%</span>
+        {% else %}
+          N/A
+        {% endif %}
+      </span>
+      <span class="text-[11px] text-slate-400">
+        {% if stats.total_attempts > 0 %}{{ stats.passed_count }} Passed, {{ stats.failed_count }} Failed{% else %}0 attempts recorded{% endif %}
+      </span>
     </div>
+
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
       <span class="block text-xs font-bold text-slate-500 uppercase">Evaluations Analyzed</span>
       <span class="text-2xl font-black text-blue-600 mt-1 block">{{ stats.total_attempts }}</span>
       <span class="text-[11px] text-slate-400">Total verified submissions</span>
     </div>
+
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="block text-xs font-bold text-slate-500 uppercase">Active Students</span>
+      <span class="block text-xs font-bold text-slate-500 uppercase">Enrollment & Quizzes</span>
       <span class="text-2xl font-black text-indigo-600 mt-1 block">{{ stats.total_students }}</span>
-      <span class="text-[11px] text-slate-400">Class enrollment count</span>
+      <span class="text-[11px] text-slate-400">{{ stats.total_quizzes }} Quizzes published</span>
     </div>
   </div>
 
-  <!-- Visual Analytics Charts (Section 18) -->
+  <!-- Secondary Metrics Strip: Highest & Lowest Score -->
+  {% if stats.total_attempts > 0 %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+      <div>
+        <span class="block text-xs font-bold text-slate-500 uppercase">Highest Score Secured</span>
+        <span class="text-xl font-black text-emerald-700 mt-0.5 block">{{ stats.highest_score }} Marks</span>
+      </div>
+      <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+        🏆
+      </div>
+    </div>
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+      <div>
+        <span class="block text-xs font-bold text-slate-500 uppercase">Lowest Score Recorded</span>
+        <span class="text-xl font-black text-slate-700 mt-0.5 block">{{ stats.lowest_score }} Marks</span>
+      </div>
+      <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">
+        📉
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Visual Analytics Charts OR Real Empty State -->
+  {% if stats.total_attempts > 0 %}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Chart 1: Marks Distribution -->
+    <!-- Chart 1: Score Range Distribution -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
       <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
         <h3 class="text-sm font-bold text-slate-900">Score Range Distribution</h3>
-        <p class="text-xs text-slate-500">Number of students falling into percentage quintiles</p>
+        <p class="text-xs text-slate-500">Student percentage quintiles computed from database</p>
       </div>
       <div class="p-4" style="height: 280px; position: relative;">
         <canvas id="scoreDistChart"></canvas>
       </div>
     </div>
 
-    <!-- Chart 2: Unit-Wise Comparison -->
+    <!-- Chart 2: Curriculum Unit-Wise Mastery -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
       <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
         <h3 class="text-sm font-bold text-slate-900">Curriculum Unit-Wise Mastery</h3>
-        <p class="text-xs text-slate-500">Average percentage across syllabus units</p>
+        <p class="text-xs text-slate-500">Average percentage achieved across syllabus units</p>
       </div>
       <div class="p-4" style="height: 280px; position: relative;">
         <canvas id="unitCompChart"></canvas>
@@ -78,7 +116,7 @@
     <!-- Chart 3: Pass vs Fail Ratio -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
       <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
-        <h3 class="text-sm font-bold text-slate-900">Passing vs Failing Ratio</h3>
+        <h3 class="text-sm font-bold text-slate-900">Pass vs Fail Ratio</h3>
         <p class="text-xs text-slate-500">Proportion of student attempts meeting institutional standard (40%)</p>
       </div>
       <div class="p-4 flex items-center justify-center" style="height: 280px; position: relative;">
@@ -86,133 +124,165 @@
       </div>
     </div>
 
-    <!-- Chart 4: Answer Accuracy Breakdown -->
+    <!-- Chart 4: Question Accuracy Breakdown -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
       <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
         <h3 class="text-sm font-bold text-slate-900">Question Accuracy Breakdown</h3>
-        <p class="text-xs text-slate-500">Correct vs Incorrect responses recorded</p>
+        <p class="text-xs text-slate-500">Total answers recorded across submitted exams</p>
       </div>
       <div class="p-4 flex items-center justify-center" style="height: 280px; position: relative;">
         <canvas id="accuracyChart"></canvas>
       </div>
     </div>
+
+    <!-- Chart 5: Division-Wise Performance (If multiple divisions present) -->
+    {% if stats.divisionStats and stats.divisionStats|length > 0 %}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden lg:col-span-2">
+      <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
+        <h3 class="text-sm font-bold text-slate-900">Division-Wise Performance Breakdown</h3>
+        <p class="text-xs text-slate-500">Comparison of average percentage and attempts across academic divisions</p>
+      </div>
+      <div class="p-4" style="height: 260px; position: relative;">
+        <canvas id="divisionPerfChart"></canvas>
+      </div>
+    </div>
+    {% endif %}
   </div>
+
+  <!-- Chart.js Initialization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 1. Score Range Distribution
+      const distCtx = document.getElementById('scoreDistChart');
+      if (distCtx) {
+        const ranges = {{ stats.scoreDistribution|tojson }};
+        new Chart(distCtx, {
+          type: 'bar',
+          data: {
+            labels: ranges.map(r => r.range),
+            datasets: [{
+              label: 'Students',
+              data: ranges.map(r => r.count),
+              backgroundColor: '#2563eb',
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+          }
+        });
+      }
+
+      // 2. Unit Comparison
+      const unitCtx = document.getElementById('unitCompChart');
+      if (unitCtx) {
+        const unitData = {{ stats.unitComparison|tojson }};
+        new Chart(unitCtx, {
+          type: 'bar',
+          data: {
+            labels: unitData.map(u => u.unit),
+            datasets: [{
+              label: 'Avg Score %',
+              data: unitData.map(u => u.averagePercentage),
+              backgroundColor: '#0f2744',
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, max: 100 }
+            }
+          }
+        });
+      }
+
+      // 3. Pass vs Fail
+      const passFailCtx = document.getElementById('passFailChart');
+      if (passFailCtx) {
+        new Chart(passFailCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Passed (≥ 40%)', 'Failed (< 40%)'],
+            datasets: [{
+              data: [{{ stats.passed_count }}, {{ stats.failed_count }}],
+              backgroundColor: ['#10b981', '#ef4444'],
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } }
+          }
+        });
+      }
+
+      // 4. Accuracy Breakdown
+      const accCtx = document.getElementById('accuracyChart');
+      if (accCtx) {
+        new Chart(accCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Correct', 'Wrong', 'Unattempted'],
+            datasets: [{
+              data: [{{ stats.total_correct }}, {{ stats.total_wrong }}, {{ stats.total_unattempted }}],
+              backgroundColor: ['#3b82f6', '#ef4444', '#94a3b8'],
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } }
+          }
+        });
+      }
+
+      // 5. Division Performance
+      const divCtx = document.getElementById('divisionPerfChart');
+      if (divCtx) {
+        const divStats = {{ stats.divisionStats|tojson }};
+        new Chart(divCtx, {
+          type: 'bar',
+          data: {
+            labels: divStats.map(d => 'Division ' + d.division),
+            datasets: [{
+              label: 'Average Score %',
+              data: divStats.map(d => d.averagePercentage),
+              backgroundColor: '#6366f1',
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, max: 100 }
+            }
+          }
+        });
+      }
+    });
+  </script>
+  {% else %}
+  <!-- Empty Analytics State -->
+  <div class="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
+    <div style="font-size: 36px; margin-bottom: 12px;">📊</div>
+    <h3 class="text-base font-bold text-slate-800 mb-1">No analytics available yet.</h3>
+    <p class="text-xs text-slate-500 max-w-md mx-auto">
+      No analytics available yet. Students must complete quizzes before analytics can be generated.
+    </p>
+  </div>
+  {% endif %}
 </div>
-
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // 1. Score Range Distribution
-    const distCtx = document.getElementById('scoreDistChart');
-    if (distCtx) {
-      new Chart(distCtx, {
-        type: 'bar',
-        data: {
-          labels: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
-          datasets: [{
-            label: 'Students',
-            data: [
-              {{ stats.get('score_dist_0_20', 0) }},
-              {{ stats.get('score_dist_21_40', 0) }},
-              {{ stats.get('score_dist_41_60', 1) }},
-              {{ stats.get('score_dist_61_80', 2) }},
-              {{ stats.get('score_dist_81_100', 3) }}
-            ],
-            backgroundColor: '#2563eb',
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, ticks: { precision: 0 } }
-          }
-        }
-      });
-    }
-
-    // 2. Unit Comparison
-    const unitCtx = document.getElementById('unitCompChart');
-    if (unitCtx) {
-      new Chart(unitCtx, {
-        type: 'bar',
-        data: {
-          labels: ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4'],
-          datasets: [{
-            label: 'Avg Score %',
-            data: [
-              {{ stats.get('unit1_avg', 75) }},
-              {{ stats.get('unit2_avg', 68) }},
-              {{ stats.get('unit3_avg', 82) }},
-              {{ stats.get('unit4_avg', 70) }}
-            ],
-            backgroundColor: '#0f2744',
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, max: 100 }
-          }
-        }
-      });
-    }
-
-    // 3. Pass vs Fail
-    const passFailCtx = document.getElementById('passFailChart');
-    if (passFailCtx) {
-      const passCount = {{ stats.passed_count|default(1) }};
-      const failCount = {{ stats.failed_count|default(0) }};
-      new Chart(passFailCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Passed (≥ 40%)', 'Failed (< 40%)'],
-          datasets: [{
-            data: [passCount > 0 || failCount > 0 ? passCount : 1, failCount],
-            backgroundColor: ['#10b981', '#ef4444'],
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom' }
-          }
-        }
-      });
-    }
-
-    // 4. Accuracy Breakdown
-    const accCtx = document.getElementById('accuracyChart');
-    if (accCtx) {
-      const corr = {{ stats.get('total_correct', 15) }};
-      const wrong = {{ stats.get('total_wrong', 3) }};
-      new Chart(accCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Correct', 'Incorrect / Skipped'],
-          datasets: [{
-            data: [corr, wrong],
-            backgroundColor: ['#3b82f6', '#f59e0b'],
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom' }
-          }
-        }
-      });
-    }
-  });
-</script>
 {% endblock %}

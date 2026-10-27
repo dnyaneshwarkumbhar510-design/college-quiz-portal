@@ -32,9 +32,12 @@ def faculty_dashboard():
 def faculty_students():
     fac = session.get('faculty')
     students = StudentRepository.get_all()
-    # Enrich students with attempt counts and avg score
     enriched = []
+    classes_set = set()
+    depts_set = set()
     for s in students:
+        if s.get('class_name'): classes_set.add(s['class_name'])
+        if s.get('department'): depts_set.add(s['department'])
         attempts = AttemptRepository.get_student_attempts(s['id'])
         comp = [a for a in attempts if a.get('status') != 'in_progress']
         count = len(comp)
@@ -44,8 +47,15 @@ def faculty_students():
         s_copy['attempts_count'] = count
         s_copy['average_score'] = avg
         s_copy['pass_count'] = pass_c
+        s_copy['reg_date'] = s.get('created_at')
         enriched.append(s_copy)
-    return render_template('faculty/students.html', faculty=fac, students=enriched)
+    return render_template('faculty/students.html',
+                           faculty=fac,
+                           students=enriched,
+                           total_students=len(enriched),
+                           classes=sorted(list(classes_set)),
+                           departments=sorted(list(depts_set)),
+                           divisions=Config.DIVISIONS)
 
 @faculty_bp.route('/admin/students/<student_id>')
 @faculty_required
@@ -68,7 +78,15 @@ def faculty_student_detail(student_id):
 def faculty_downloads():
     fac = session.get('faculty')
     subjects = SubjectRepository.get_all()
-    return render_template('faculty/downloads.html', faculty=fac, subjects=subjects, divisions=Config.DIVISIONS)
+    quizzes = QuizRepository.get_all()
+    students = StudentRepository.get_all()
+    classes = sorted(list(set(s['class_name'] for s in students if s.get('class_name'))))
+    return render_template('faculty/downloads.html',
+                           faculty=fac,
+                           subjects=subjects,
+                           quizzes=quizzes,
+                           classes=classes,
+                           divisions=Config.DIVISIONS)
 
 @faculty_bp.route('/admin/settings')
 @faculty_required

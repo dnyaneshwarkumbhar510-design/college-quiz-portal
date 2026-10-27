@@ -4,10 +4,10 @@
 <div class="space-y-6 max-w-5xl mx-auto">
   <!-- Title -->
   <div>
-    <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Official Exports</span>
+    <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Official Assessment Reports</span>
     <h1 class="text-2xl font-black text-slate-900 tracking-tight">Institutional Data Export Center</h1>
     <p class="text-xs text-slate-500 font-medium mt-0.5">
-      Generate filtered class result spreadsheets and overall 60-mark curriculum reports.
+      Export verified examination records, individual quiz results, student registry data, and aggregated 60-mark curriculum spreadsheets directly from the database.
     </p>
   </div>
 
@@ -17,34 +17,116 @@
       <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
       </svg>
-      <h3 class="text-sm font-bold text-slate-900">Select Course Subject & Division Filter</h3>
+      <h3 class="text-sm font-bold text-slate-900">Configure Filter Parameters for Exports</h3>
     </div>
-    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <!-- Target Quiz -->
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Target Subject</label>
-        <select id="downloadSubjectSelect" class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
-          {% for sub in subjects %}
-          <option value="{{ sub.id }}">{{ sub.code }} - {{ sub.name }}</option>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Target Quiz</label>
+        <select id="downloadQuizSelect" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+          <option value="ALL">All Available Quizzes</option>
+          {% for q in quizzes %}
+          <option value="{{ q.id }}">{{ q.title }} (Unit {{ q.unit_number }})</option>
           {% endfor %}
         </select>
       </div>
 
+      <!-- Target Division -->
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Filter by Division</label>
-        <select id="downloadDivisionSelect" class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Division Filter</label>
+        <select id="downloadDivisionSelect" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
           <option value="ALL">All Divisions</option>
           {% for div in divisions %}
           <option value="{{ div }}">Division {{ div }}</option>
           {% endfor %}
         </select>
       </div>
+
+      <!-- Target Class -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Class / Year</label>
+        <select id="downloadClassSelect" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+          <option value="ALL">All Classes</option>
+          {% for c in classes %}
+          <option value="{{ c }}">{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
   </div>
 
-  <!-- Download Cards Grid (Section 46) -->
+  <div id="exportStatusMsg" class="hidden alert alert-warning"></div>
+
+  <!-- Download Cards Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <!-- Card 1: Overall 60-Mark Combined Results -->
-    <div class="bg-blue-50/40 border-2 border-blue-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+    <!-- Card 1: Student Results CSV -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+      <div>
+        <div class="flex justify-between items-start">
+          <span class="p-2 rounded-lg bg-blue-600 text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </span>
+          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+            Filtered Submissions
+          </span>
+        </div>
+        <h3 class="text-base font-bold text-slate-900 mt-3">
+          Student Examination Results CSV
+        </h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Export candidate submission scores filtered by active Quiz, Division, and Class selections, including marks obtained, percentage, and submission timestamps.
+        </p>
+      </div>
+
+      <div class="pt-5">
+        <button type="button"
+                onclick="handleDownloadStudentResultsCsv()"
+                class="btn btn-primary w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download Filtered Results CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Card 2: Student Registry Performance CSV -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+      <div>
+        <div class="flex justify-between items-start">
+          <span class="p-2 rounded-lg bg-[#0f2744] text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+          </span>
+          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800">
+            Candidate Registry
+          </span>
+        </div>
+        <h3 class="text-base font-bold text-slate-900 mt-3">
+          Student Performance Registry CSV
+        </h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Export full enrollment registry with roll numbers, academic divisions, departments, total attempt counts, and average cumulative performance.
+        </p>
+      </div>
+
+      <div class="pt-5">
+        <button type="button"
+                onclick="handleDownloadStudentRegistryCsv()"
+                class="btn btn-outline w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download Candidate Registry CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Card 3: Overall 60-Mark Combined Assessment CSV -->
+    <div class="bg-blue-50/40 border-2 border-blue-200 rounded-xl p-5 shadow-xs flex flex-col justify-between md:col-span-2">
       <div>
         <div class="flex justify-between items-start">
           <span class="p-2 rounded-lg bg-[#0f2744] text-white">
@@ -53,169 +135,193 @@
             </svg>
           </span>
           <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
-            Out of 60 Marks
+            Out of 60 Marks (Combined Units 1–4)
           </span>
         </div>
         <h3 class="text-base font-bold text-slate-900 mt-3">
-          Overall 60-Mark Comprehensive Results
+          Overall 60-Mark Comprehensive Assessment Report
         </h3>
         <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-          Aggregated results combining Unit 1, Unit 2, Unit 3, and Unit 4 marks per student with total percentage and overall pass/fail status.
+          Aggregated institutional assessment report combining Unit 1, Unit 2, Unit 3, and Unit 4 marks per student with total overall percentage and passing status.
         </p>
       </div>
 
       <div class="pt-5">
         <button type="button"
-                id="btnDownloadOverall"
-                class="btn btn-primary w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
+                onclick="handleDownloadOverall60MarksCsv()"
+                class="btn btn-navy w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
           </svg>
-          Download Overall Results CSV
+          Download Overall 60-Mark Results CSV
         </button>
-      </div>
-    </div>
-
-    <!-- Card 2: Unit-Wise CSV Downloads -->
-    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
-      <div>
-        <div class="flex justify-between items-start">
-          <span class="p-2 rounded-lg bg-emerald-600 text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-          </span>
-          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-            15 Marks Each
-          </span>
-        </div>
-        <h3 class="text-base font-bold text-slate-900 mt-3">
-          Unit-Wise Examination Results
-        </h3>
-        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-          Export detailed individual unit results with rank, correct/wrong counts, and submission timestamps.
-        </p>
-      </div>
-
-      <div class="pt-5 space-y-2">
-        <div class="grid grid-cols-2 gap-2">
-          <button type="button" onclick="downloadUnitCsv(1)" class="btn btn-outline btn-sm text-xs font-semibold">
-            Unit 1 CSV
-          </button>
-          <button type="button" onclick="downloadUnitCsv(2)" class="btn btn-outline btn-sm text-xs font-semibold">
-            Unit 2 CSV
-          </button>
-          <button type="button" onclick="downloadUnitCsv(3)" class="btn btn-outline btn-sm text-xs font-semibold">
-            Unit 3 CSV
-          </button>
-          <button type="button" onclick="downloadUnitCsv(4)" class="btn btn-outline btn-sm text-xs font-semibold">
-            Unit 4 CSV
-          </button>
-        </div>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-  function exportToCsv(filename, rows) {
-    const processRow = function (row) {
-      let finalVal = '';
-      for (let j = 0; j < row.length; j++) {
-        let innerValue = row[j] === null || row[j] === undefined ? '' : row[j].toString();
-        let result = innerValue.replace(/"/g, '""');
-        if (result.search(/("|,|\n)/g) >= 0)
-          result = '"' + result + '"';
-        if (j > 0)
-          finalVal += ',';
-        finalVal += result;
-      }
-      return finalVal + '\n';
-    };
+  function showStatus(msg) {
+    const el = document.getElementById('exportStatusMsg');
+    if (el) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 5000);
+    } else {
+      alert(msg);
+    }
+  }
 
+  function exportCsvBlob(filename, rows) {
     let csvFile = '';
     for (let i = 0; i < rows.length; i++) {
-      csvFile += processRow(rows[i]);
+      const row = rows[i];
+      let line = '';
+      for (let j = 0; j < row.length; j++) {
+        let val = row[j] === null || row[j] === undefined ? '' : row[j].toString();
+        let cleaned = val.replace(/"/g, '""');
+        if (cleaned.search(/("|,|\n)/g) >= 0) cleaned = '"' + cleaned + '"';
+        if (j > 0) line += ',';
+        line += cleaned;
+      }
+      csvFile += line + '\n';
     }
 
     const blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute("download", filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
-  async function downloadUnitCsv(unitNumber) {
+  // 1. Download Filtered Student Results CSV
+  async function handleDownloadStudentResultsCsv() {
+    const quizId = document.getElementById('downloadQuizSelect').value;
     const div = document.getElementById('downloadDivisionSelect').value;
-    const url = `/api/admin/results?unitNumber=${unitNumber}${div !== 'ALL' ? `&division=${div}` : ''}`;
+    const cls = document.getElementById('downloadClassSelect').value;
+
+    let url = '/api/admin/results?';
+    const params = [];
+    if (quizId !== 'ALL') params.push(`quiz_id=${encodeURIComponent(quizId)}`);
+    if (div !== 'ALL') params.push(`division=${encodeURIComponent(div)}`);
+    if (cls !== 'ALL') params.push(`class_name=${encodeURIComponent(cls)}`);
+    url += params.join('&');
 
     try {
       const res = await fetch(url);
       const data = await res.json();
-      if (!data.success) {
-        alert('Failed to retrieve unit data');
+      if (!data.success || !data.rows || data.rows.length === 0) {
+        showStatus("No results available for download.");
         return;
       }
 
       const headers = [
-        'Rank', 'Student Name', 'Roll Number', 'Division', 'Class', 'Department',
-        'Quiz Name', 'Unit', 'Marks Obtained', 'Total Marks', 'Percentage',
-        'Correct Answers', 'Wrong Answers', 'Unattempted', 'Status', 'Submission Date'
+        'Rank', 'Candidate Name', 'Roll Number', 'Division', 'Class', 'Department',
+        'Quiz Title', 'Unit', 'Marks Obtained', 'Full Marks', 'Percentage',
+        'Correct', 'Wrong', 'Unattempted', 'Status', 'Submission Date'
       ];
 
-      const dataRows = (data.rows || []).map((r, idx) => [
+      const dataRows = data.rows.map((r, idx) => [
         idx + 1,
-        r.student_name || r.studentName,
-        r.roll_number || r.rollNumber,
+        r.studentName || r.student_name,
+        r.rollNumber || r.roll_number,
         r.division,
-        r.class_name || r.className,
+        r.className || r.class_name,
         r.department,
-        r.quiz_title || r.quizTitle,
-        `Unit ${r.unit_number || r.unitNumber}`,
-        r.obtained_marks || r.marks,
-        r.total_marks || r.totalMarks,
+        r.quizTitle || r.quiz_title,
+        `Unit ${r.unitNumber || r.unit_number}`,
+        r.marks || r.obtained_marks,
+        r.totalMarks || r.total_marks,
         `${r.percentage}%`,
-        r.correct_count || r.correct,
-        r.wrong_count || r.wrong,
-        r.unattempted_count || r.unattempted,
+        r.correct !== undefined ? r.correct : r.correct_answers,
+        r.wrong !== undefined ? r.wrong : r.wrong_answers,
+        r.unattempted !== undefined ? r.unattempted : 0,
         r.status,
-        (r.submitted_at || '').substring(0, 16)
+        (r.submittedAt || r.submitted_at || '').substring(0, 16)
       ]);
 
-      const fname = `Unit${unitNumber}_Results_${div !== 'ALL' ? `Div${div}_` : ''}${new Date().toISOString().slice(0, 10)}.csv`;
-      exportToCsv(fname, [headers, ...dataRows]);
+      const fname = `Student_Results_${div !== 'ALL' ? `Div${div}_` : ''}${new Date().toISOString().slice(0, 10)}.csv`;
+      exportCsvBlob(fname, [headers, ...dataRows]);
     } catch (e) {
-      console.error(e);
-      alert('Error exporting CSV: ' + e.message);
+      showStatus("Error generating CSV: " + e.message);
     }
   }
 
-  document.getElementById('btnDownloadOverall').addEventListener('click', async function() {
-    const subId = document.getElementById('downloadSubjectSelect').value;
+  // 2. Download Candidate Registry CSV
+  async function handleDownloadStudentRegistryCsv() {
+    try {
+      const res = await fetch('/api/admin/students');
+      const data = await res.json();
+      if (!data.success || !data.students || data.students.length === 0) {
+        showStatus("No results available for download.");
+        return;
+      }
+
+      const div = document.getElementById('downloadDivisionSelect').value;
+      const cls = document.getElementById('downloadClassSelect').value;
+
+      let students = data.students;
+      if (div !== 'ALL') students = students.filter(s => (s.division || '').toUpperCase() === div.toUpperCase());
+      if (cls !== 'ALL') students = students.filter(s => (s.class_name || '').toLowerCase() === cls.toLowerCase());
+
+      if (students.length === 0) {
+        showStatus("No results available for download.");
+        return;
+      }
+
+      const headers = [
+        'Roll Number', 'Candidate Name', 'Division', 'Class', 'Department',
+        'Institutional Email', 'Quiz Attempts Count', 'Average Score', 'Status'
+      ];
+
+      const dataRows = students.map(s => [
+        s.roll_number,
+        s.full_name,
+        s.division,
+        s.class_name,
+        s.department,
+        s.email || '-',
+        s.attemptsCount !== undefined ? s.attemptsCount : s.attempts_count,
+        s.averageScore !== undefined ? s.averageScore : s.average_score,
+        s.status || 'ACTIVE'
+      ]);
+
+      const fname = `Candidate_Registry_${new Date().toISOString().slice(0, 10)}.csv`;
+      exportCsvBlob(fname, [headers, ...dataRows]);
+    } catch (e) {
+      showStatus("Error exporting candidate registry: " + e.message);
+    }
+  }
+
+  // 3. Download Overall 60-Marks Assessment CSV
+  async function handleDownloadOverall60MarksCsv() {
     const div = document.getElementById('downloadDivisionSelect').value;
-    const url = `/api/admin/results?type=overall-ranking&subjectId=${subId}`;
+    const url = `/api/admin/results?type=overall-ranking`;
 
     try {
       const res = await fetch(url);
       const data = await res.json();
-      if (!data.success) {
-        alert('Failed to retrieve overall data');
+      if (!data.success || !data.overallRankings || data.overallRankings.length === 0) {
+        showStatus("No results available for download.");
         return;
       }
 
-      let rows = data.overallRankings || [];
+      let rows = data.overallRankings;
       if (div !== 'ALL') {
         rows = rows.filter(r => (r.division || '').toUpperCase() === div.toUpperCase());
       }
 
+      if (rows.length === 0) {
+        showStatus("No results available for download.");
+        return;
+      }
+
       const headers = [
-        'Overall Rank', 'Student Name', 'Roll Number', 'Division', 'Class', 'Department',
+        'Overall Rank', 'Candidate Name', 'Roll Number', 'Division', 'Class', 'Department',
         'Unit 1 Marks (/15)', 'Unit 2 Marks (/15)', 'Unit 3 Marks (/15)', 'Unit 4 Marks (/15)',
         'Total Marks (/60)', 'Overall Percentage', 'Overall Status'
       ];
@@ -236,12 +342,11 @@
         r.overall_status
       ]);
 
-      const fname = `Overall_60Marks_Results_${div !== 'ALL' ? `Div${div}_` : ''}${new Date().toISOString().slice(0, 10)}.csv`;
-      exportToCsv(fname, [headers, ...dataRows]);
+      const fname = `Overall_60Marks_Assessment_${div !== 'ALL' ? `Div${div}_` : ''}${new Date().toISOString().slice(0, 10)}.csv`;
+      exportCsvBlob(fname, [headers, ...dataRows]);
     } catch (e) {
-      console.error(e);
-      alert('Error exporting overall CSV: ' + e.message);
+      showStatus("Error exporting overall assessment: " + e.message);
     }
-  });
+  }
 </script>
 {% endblock %}

@@ -473,6 +473,14 @@ class AttemptRepository:
             u_num = int(filters['unitNumber'])
             rows = [r for r in rows if r['unitNumber'] == u_num]
 
+        if filters.get('quiz_id') and filters['quiz_id'] != 'ALL':
+            q_val = str(filters['quiz_id']).strip()
+            rows = [r for r in rows if str(r['quizId']) == q_val]
+
+        if filters.get('class_name') and filters['class_name'] != 'ALL':
+            c_val = str(filters['class_name']).strip().lower()
+            rows = [r for r in rows if r['className'].strip().lower() == c_val]
+
         if filters.get('status') and filters['status'] != 'ALL':
             st_val = str(filters['status']).strip().upper()
             rows = [r for r in rows if r['status'].upper() == st_val]
@@ -548,6 +556,53 @@ class AttemptRepository:
                 else: distribution['81-100%'] += 1
 
         pass_percentage = round((pass_count / total_attempts) * 100.0, 1) if total_attempts > 0 else 0.0
+        fail_percentage = round((fail_count / total_attempts) * 100.0, 1) if total_attempts > 0 else 0.0
+
+        # Division-wise performance breakdown
+        division_performance = {}
+        for r in filtered_results:
+            div = (r.get('division') or 'Unknown').strip().upper()
+            if div not in division_performance:
+                division_performance[div] = {'attempts': 0, 'sum_pct': 0.0, 'pass_count': 0}
+            division_performance[div]['attempts'] += 1
+            division_performance[div]['sum_pct'] += r['percentage']
+            if r['status'] == 'PASS':
+                division_performance[div]['pass_count'] += 1
+
+        division_stats = []
+        for div_name in sorted(division_performance.keys()):
+            d_data = division_performance[div_name]
+            d_count = d_data['attempts']
+            d_avg = round(d_data['sum_pct'] / d_count, 1) if d_count > 0 else 0.0
+            d_pass_rate = round((d_data['pass_count'] / d_count) * 100.0, 1) if d_count > 0 else 0.0
+            division_stats.append({
+                'division': div_name,
+                'attempts': d_count,
+                'averagePercentage': d_avg,
+                'passPercentage': d_pass_rate
+            })
+
+        # Quiz-wise performance breakdown
+        quiz_performance = {}
+        for r in filtered_results:
+            q_id = r.get('quizId')
+            q_title = r.get('quizTitle') or 'Unit Quiz'
+            if q_id not in quiz_performance:
+                quiz_performance[q_id] = {'title': q_title, 'attempts': 0, 'sum_marks': 0.0, 'sum_pct': 0.0}
+            quiz_performance[q_id]['attempts'] += 1
+            quiz_performance[q_id]['sum_marks'] += r['marks']
+            quiz_performance[q_id]['sum_pct'] += r['percentage']
+
+        quiz_stats = []
+        for q_id, q_data in quiz_performance.items():
+            q_count = q_data['attempts']
+            quiz_stats.append({
+                'quizId': q_id,
+                'title': q_data['title'],
+                'attempts': q_count,
+                'averageMarks': round(q_data['sum_marks'] / q_count, 1) if q_count > 0 else 0.0,
+                'averagePercentage': round(q_data['sum_pct'] / q_count, 1) if q_count > 0 else 0.0
+            })
 
         # Unit comparison across units 1, 2, 3, 4
         unit_comparison = []
@@ -571,12 +626,29 @@ class AttemptRepository:
 
         return {
             'totalStudents': total_students,
+            'total_students': total_students,
             'totalQuizzes': total_quizzes,
+            'total_quizzes': total_quizzes,
             'totalAttempts': total_attempts,
+            'total_attempts': total_attempts,
             'averageClassScore': avg_score,
+            'average_score': avg_score,
+            'average_percentage': avg_score,
             'highestScore': high_score,
+            'highest_score': high_score,
             'lowestScore': low_score,
+            'lowest_score': low_score,
             'passPercentage': pass_percentage,
+            'pass_percentage': pass_percentage,
+            'failPercentage': fail_percentage,
+            'fail_percentage': fail_percentage,
+            'passed_count': pass_count,
+            'failed_count': fail_count,
+            'total_correct': total_correct,
+            'total_wrong': total_wrong,
+            'total_unattempted': total_unattempted,
+            'divisionStats': division_stats,
+            'quizStats': quiz_stats,
             'scoreDistribution': [
                 {'range': '0–20%', 'count': distribution['0-20%']},
                 {'range': '21–40%', 'count': distribution['21-40%']},

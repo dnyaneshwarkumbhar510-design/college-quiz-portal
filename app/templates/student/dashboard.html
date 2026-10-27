@@ -92,7 +92,7 @@
 
   <!-- Published Quizzes Grid -->
   {% if publishedQuizzes and publishedQuizzes|length > 0 %}
-    <div class="features-grid" id="quizzesGrid" style="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));">
+    <div class="features-grid" id="quizzesGrid" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));">
       {% for q in publishedQuizzes %}
         <div class="card quiz-card" data-subject-id="{{ q.subject_id }}" data-title="{{ q.title|lower }} {{ q.unit_title|lower }} {{ q.subject_name|lower }}" style="display: flex; flex-direction: column; justify-content: space-between;">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
