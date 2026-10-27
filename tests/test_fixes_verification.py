@@ -45,8 +45,12 @@ class TestFixesVerification(unittest.TestCase):
     def test_supabase_payload_columns_match_production_schema(self):
         """
         Verify that when a Supabase client is present, create_quiz sends ONLY
-        valid Supabase schema columns (no 'duration', 'total_questions', 'status',
-        'published', 'created_by', 'subject', or 'updated_at').
+        valid Supabase schema columns matching the real production schema:
+        - uses 'duration' (NOT 'duration_minutes' which causes PGRST204)
+        - uses 'total_questions' (NOT 'question_count')
+        - uses 'pass_percentage' (NOT 'passing_percentage')
+        - uses 'published' (NOT 'is_published')
+        - includes 'created_at' and 'updated_at'
         """
         mock_supabase = MagicMock()
         mock_table = MagicMock()
@@ -56,6 +60,7 @@ class TestFixesVerification(unittest.TestCase):
         expected_created_row = {
             'id': 'test-uuid-001',
             'subject_id': 'c0000000-0000-0000-0000-000000000001',
+            'subject': 'Data Structures & Algorithms',
             'unit_number': 2,
             'unit_title': 'Unit 2 Topic',
             'title': 'Production Schema Verified Quiz',
@@ -63,14 +68,17 @@ class TestFixesVerification(unittest.TestCase):
             'class_name': 'TE Computer',
             'division': 'All',
             'department': 'Computer Engineering',
-            'duration_minutes': 20,
-            'question_count': 0,
+            'duration': 20,
+            'total_questions': 0,
+            'marks_per_question': 1.0,
             'total_marks': 15.0,
-            'passing_percentage': 40.0,
-            'is_published': False,
+            'pass_percentage': 40.0,
+            'status': 'draft',
+            'published': False,
             'randomize_questions': False,
             'randomize_options': False,
-            'created_at': '2026-10-27T00:00:00+00:00'
+            'created_at': '2026-10-27T00:00:00+00:00',
+            'updated_at': '2026-10-27T00:00:00+00:00'
         }
 
         mock_execute.return_value = MagicMock(data=[expected_created_row])
@@ -87,6 +95,7 @@ class TestFixesVerification(unittest.TestCase):
                 'title': 'Production Schema Verified Quiz',
                 'description': 'Verified description',
                 'subject_id': 'c0000000-0000-0000-0000-000000000001',
+                'subject_name': 'Data Structures & Algorithms',
                 'unit_number': 2,
                 'unit_title': 'Unit 2 Topic',
                 'class_name': 'TE Computer',
@@ -105,26 +114,30 @@ class TestFixesVerification(unittest.TestCase):
 
             # Critical assertion: only valid Supabase columns must be present
             valid_supabase_quizzes_columns = {
-                'id', 'subject_id', 'unit_number', 'unit_title', 'title', 'description',
-                'class_name', 'division', 'department', 'duration_minutes', 'question_count',
-                'total_marks', 'passing_percentage', 'is_published', 'randomize_questions',
-                'randomize_options', 'created_at'
+                'id', 'subject_id', 'subject', 'unit_number', 'unit_title', 'title', 'description',
+                'class_name', 'division', 'department', 'duration', 'total_questions',
+                'marks_per_question', 'total_marks', 'pass_percentage', 'created_by', 'status',
+                'published', 'randomize_questions', 'randomize_options', 'created_at', 'updated_at'
             }
 
             for key in actual_payload.keys():
                 self.assertIn(key, valid_supabase_quizzes_columns, f"Forbidden column '{key}' sent to Supabase quizzes table!")
 
-            # Verify forbidden columns are absent
-            self.assertNotIn('duration', actual_payload)
-            self.assertNotIn('total_questions', actual_payload)
-            self.assertNotIn('pass_percentage', actual_payload)
-            self.assertNotIn('published', actual_payload)
-            self.assertNotIn('status', actual_payload)
-            self.assertNotIn('subject', actual_payload)
-            self.assertNotIn('created_by', actual_payload)
-            self.assertNotIn('updated_at', actual_payload)
+            # Verify unsupported columns that cause PGRST204 are absent
+            self.assertNotIn('duration_minutes', actual_payload, "duration_minutes causes PGRST204 and must NOT be sent!")
+            self.assertNotIn('question_count', actual_payload, "question_count must not be sent to Supabase quizzes!")
+            self.assertNotIn('passing_percentage', actual_payload, "passing_percentage must not be sent to Supabase quizzes!")
+            self.assertNotIn('is_published', actual_payload, "is_published must not be sent to Supabase quizzes!")
 
-            # Verify normalized return values
+            # Verify real columns are present
+            self.assertIn('duration', actual_payload)
+            self.assertIn('total_questions', actual_payload)
+            self.assertIn('pass_percentage', actual_payload)
+            self.assertIn('published', actual_payload)
+            self.assertIn('created_at', actual_payload)
+            self.assertIn('updated_at', actual_payload)
+
+            # Verify normalized return values provide both aliases
             self.assertEqual(created['duration'], 20)
             self.assertEqual(created['duration_minutes'], 20)
             self.assertEqual(created['total_questions'], 0)
@@ -133,6 +146,55 @@ class TestFixesVerification(unittest.TestCase):
             self.assertEqual(created['pass_percentage'], 40.0)
             self.assertFalse(created['is_published'])
             self.assertFalse(created['published'])
+
+    def test_quiz_update_payload_matches_production_schema(self):
+        """
+        Verify that update_quiz sends only production-compatible columns to Supabase
+        ('duration', 'pass_percentage', 'published', 'updated_at') and NOT
+        ('duration_minutes', 'passing_percentage', 'is_published').
+        """
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_update = MagicMock()
+        mock_execute = MagicMock()
+
+        updated_row = {
+            'id': 'test-quiz-upd-01',
+            'title': 'Updated Quiz Title',
+            'duration': 45,
+            'pass_percentage': 50.0,
+            'published': True,
+            'status': 'published',
+            'updated_at': '2026-10-27T12:00:00+00:00'
+        }
+        mock_execute.return_value = MagicMock(data=[updated_row])
+        mock_update.eq.return_value.execute = mock_execute
+        mock_table.update.return_value = mock_update
+        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=updated_row)
+        mock_supabase.table.return_value = mock_table
+
+        with patch('app.database.repositories.quiz_repository.get_supabase_client', return_value=mock_supabase):
+            QuizRepository.update_quiz('test-quiz-upd-01', {
+                'title': 'Updated Quiz Title',
+                'duration_minutes': 45,
+                'passing_percentage': 50.0,
+                'is_published': True
+            })
+
+            mock_supabase.table.assert_any_call('quizzes')
+            update_payload = mock_table.update.call_args[0][0]
+
+            self.assertIn('duration', update_payload)
+            self.assertEqual(update_payload['duration'], 45)
+            self.assertIn('pass_percentage', update_payload)
+            self.assertEqual(update_payload['pass_percentage'], 50.0)
+            self.assertIn('published', update_payload)
+            self.assertTrue(update_payload['published'])
+            self.assertIn('updated_at', update_payload)
+
+            self.assertNotIn('duration_minutes', update_payload)
+            self.assertNotIn('passing_percentage', update_payload)
+            self.assertNotIn('is_published', update_payload)
 
     def test_mobile_ui_css_and_overlay_rules(self):
         """

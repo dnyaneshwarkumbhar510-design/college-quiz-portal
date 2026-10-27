@@ -245,7 +245,7 @@ class QuizRepository:
             # 3. Check for unique_subject_unit constraint in Supabase
             try:
                 exist_res = supabase.table('quizzes')\
-                    .select('id, title, is_published, question_count')\
+                    .select('id, title, published, total_questions')\
                     .eq('subject_id', subject_id)\
                     .eq('unit_number', unit_num)\
                     .maybe_single()\
@@ -254,7 +254,9 @@ class QuizRepository:
                 if exist_res and getattr(exist_res, 'data', None):
                     ex_quiz = exist_res.data
                     # If existing quiz has 0 questions and is not published, reuse and update it
-                    if (ex_quiz.get('question_count') or 0) == 0 and not ex_quiz.get('is_published'):
+                    q_cnt = ex_quiz.get('total_questions') or ex_quiz.get('question_count') or 0
+                    is_published_status = bool(ex_quiz.get('published') or ex_quiz.get('is_published'))
+                    if q_cnt == 0 and not is_published_status:
                         logger.info("Reusing unconfigured draft quiz %s for subject %s unit %s", ex_quiz['id'], subject_id, unit_num)
                         upd = {
                             'title': str(data['title']).strip(),
@@ -263,11 +265,12 @@ class QuizRepository:
                             'class_name': str(data.get('class_name', 'TE Computer')).strip(),
                             'division': str(data.get('division', 'All')).strip(),
                             'department': str(data.get('department', 'Computer Engineering')).strip(),
-                            'duration_minutes': duration_val,
+                            'duration': duration_val,
                             'total_marks': total_marks_val,
-                            'passing_percentage': pass_pct_val,
+                            'pass_percentage': pass_pct_val,
                             'randomize_questions': rand_q,
                             'randomize_options': rand_opt,
+                            'updated_at': now
                         }
                         supabase.table('quizzes').update(upd).eq('id', ex_quiz['id']).execute()
                         return QuizRepository.get_by_id(ex_quiz['id'])
@@ -279,9 +282,14 @@ class QuizRepository:
                 logger.warning("Could not pre-check existing quiz in Supabase: %s", chk_err)
 
             # 4. Insert exact fields matching Supabase PostgreSQL schema
+            # Real production columns: id, subject_id, subject, unit_number, unit_title, title,
+            # description, class_name, division, department, duration, total_questions,
+            # marks_per_question, total_marks, pass_percentage, status, published,
+            # randomize_questions, randomize_options, created_at, updated_at
             supabase_payload = {
                 'id': quiz_id,
                 'subject_id': subject_id,
+                'subject': str(data.get('subject_name') or '').strip() or None,
                 'unit_number': unit_num,
                 'unit_title': str(data.get('unit_title', '') or '').strip() or f"Unit {unit_num}",
                 'title': str(data['title']).strip(),
@@ -289,15 +297,27 @@ class QuizRepository:
                 'class_name': str(data.get('class_name', 'TE Computer')).strip(),
                 'division': str(data.get('division', 'All')).strip(),
                 'department': str(data.get('department', 'Computer Engineering')).strip(),
-                'duration_minutes': duration_val,
-                'question_count': 0,
+                'duration': duration_val,
+                'total_questions': 0,
+                'marks_per_question': float(data.get('marks_per_question', 1.0) or 1.0),
                 'total_marks': total_marks_val,
-                'passing_percentage': pass_pct_val,
-                'is_published': is_pub,
+                'pass_percentage': pass_pct_val,
+                'status': 'published' if is_pub else 'draft',
+                'published': is_pub,
                 'randomize_questions': rand_q,
                 'randomize_options': rand_opt,
-                'created_at': now
+                'created_at': now,
+                'updated_at': now
             }
+
+            # Optional faculty creator UUID if valid
+            raw_cb = str(data.get('created_by') or '').strip()
+            if raw_cb and len(raw_cb) >= 32:
+                try:
+                    uuid.UUID(raw_cb)
+                    supabase_payload['created_by'] = raw_cb
+                except ValueError:
+                    pass
 
             try:
                 res = supabase.table('quizzes').insert(supabase_payload).execute()
@@ -389,7 +409,7 @@ class QuizRepository:
         
         supabase = get_supabase_client()
         if supabase:
-            update_fields = {}
+            update_fields = {'updated_at': now}
             if 'title' in data: update_fields['title'] = str(data['title']).strip()
             if 'description' in data: update_fields['description'] = str(data['description']).strip()
             if 'unit_number' in data:
@@ -398,16 +418,26 @@ class QuizRepository:
                 except (ValueError, TypeError):
                     pass
             if 'unit_title' in data: update_fields['unit_title'] = str(data['unit_title']).strip()
-            if 'duration_minutes' in data or 'duration' in data:
-                update_fields['duration_minutes'] = int(data.get('duration_minutes') or data.get('duration'))
-            if 'passing_percentage' in data or 'pass_percentage' in data:
-                update_fields['passing_percentage'] = float(data.get('passing_percentage') or data.get('pass_percentage'))
+            if 'duration' in data or 'duration_minutes' in data:
+                dur = int(data.get('duration') if 'duration' in data else data.get('duration_minutes'))
+                update_fields['duration'] = dur
+            if 'pass_percentage' in data or 'passing_percentage' in data:
+                pct = float(data.get('pass_percentage') if 'pass_percentage' in data else data.get('passing_percentage'))
+                update_fields['pass_percentage'] = pct
+            if 'total_marks' in data:
+                update_fields['total_marks'] = float(data['total_marks'])
+            if 'marks_per_question' in data:
+                update_fields['marks_per_question'] = float(data['marks_per_question'])
             if 'randomize_questions' in data: update_fields['randomize_questions'] = bool(data['randomize_questions'])
             if 'randomize_options' in data: update_fields['randomize_options'] = bool(data['randomize_options'])
+            if 'published' in data or 'is_published' in data:
+                pub = bool(data.get('published') if 'published' in data else data.get('is_published'))
+                update_fields['published'] = pub
+                update_fields['status'] = 'published' if pub else 'draft'
 
             try:
                 res = supabase.table('quizzes').update(update_fields).eq('id', clean_id).execute()
-                if not res.data or len(res.data) == 0:
+                if not res or not getattr(res, 'data', None) or len(res.data) == 0:
                     raise RuntimeError(f"Quiz with ID {clean_id} not found in Supabase")
                 return QuizRepository.get_by_id(clean_id)
             except Exception as e:
@@ -473,7 +503,8 @@ class QuizRepository:
         if not quiz:
             raise ValueError(f"Quiz with ID {clean_id} not found.")
 
-        if target_status and quiz.get('question_count', 0) == 0:
+        q_count = quiz.get('question_count', 0) or quiz.get('total_questions', 0)
+        if target_status and q_count == 0:
             raise ValueError("This quiz cannot be published because it has 0 questions. Please add questions first.")
 
         status_text = 'published' if target_status else 'draft'
@@ -481,9 +512,11 @@ class QuizRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
-                # Update is_published in Supabase quizzes table
+                # Update published in Supabase quizzes table
                 supabase.table('quizzes').update({
-                    'is_published': target_status
+                    'published': target_status,
+                    'status': status_text,
+                    'updated_at': now
                 }).eq('id', clean_id).execute()
                 return QuizRepository.get_by_id(clean_id)
             except Exception as e:
@@ -541,15 +574,21 @@ class QuizRepository:
                 rows = q_res.data or []
                 total_q = len(rows)
                 total_m = sum(float(r.get('marks') or 1.0) for r in rows)
+                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 
                 update_payload = {
-                    'question_count': total_q,
-                    'total_marks': total_m
+                    'total_questions': total_q,
+                    'total_marks': total_m,
+                    'updated_at': now
                 }
                 if total_q == 0:
-                    update_payload['is_published'] = False
+                    update_payload['published'] = False
+                    update_payload['status'] = 'draft'
                 
                 supabase.table('quizzes').update(update_payload).eq('id', clean_id).execute()
+                return total_q, total_m
+            except Exception as e:
+                logger.error("Supabase recalculate_totals error: %s", e)
                 return total_q, total_m
             except Exception as e:
                 logger.error("Supabase recalculate_totals error: %s", e)
