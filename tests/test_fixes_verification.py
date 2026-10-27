@@ -207,5 +207,144 @@ class TestFixesVerification(unittest.TestCase):
         self.assertEqual(data['quiz']['unit_number'], 3)
         self.assertEqual(data['quiz']['duration'], 25)
 
+    def test_subject_seeding_includes_created_at_and_matches_production_schema(self):
+        """
+        Verify that Supabase subject auto-seeding sends 'created_at' (NOT NULL in Supabase)
+        and does NOT send 'updated_at' (does not exist in public.subjects schema).
+        """
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_insert = MagicMock()
+        mock_execute = MagicMock()
+        mock_select = MagicMock()
+
+        # Mock select check returning None (subject does not exist yet)
+        mock_select.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=None)
+        mock_execute.return_value = MagicMock(data=[])
+        mock_insert.execute = mock_execute
+        mock_table.insert.return_value = mock_insert
+        mock_table.select = mock_select.select
+        mock_supabase.table.return_value = mock_table
+
+        SubjectRepository._seed_defaults_supabase(mock_supabase)
+
+        # Ensure insert was called for default subjects
+        self.assertGreaterEqual(mock_table.insert.call_count, 1)
+
+        valid_subject_columns = {'id', 'code', 'name', 'department', 'class_name', 'description', 'created_at'}
+
+        for call_args in mock_table.insert.call_args_list:
+            payload = call_args[0][0]
+            # Must contain created_at
+            self.assertIn('created_at', payload, "Seed payload is missing 'created_at'!")
+            self.assertIsNotNone(payload['created_at'])
+            self.assertTrue(len(str(payload['created_at'])) > 10)
+
+            # Must NOT contain updated_at
+            self.assertNotIn('updated_at', payload, "Seed payload incorrectly contains 'updated_at' which does not exist in Supabase!")
+
+            # Verify all keys are in valid production columns
+            for col in payload.keys():
+                self.assertIn(col, valid_subject_columns, f"Unexpected column '{col}' in subject seed payload!")
+
+    def test_subject_get_or_create_supabase_payload_and_none_safety(self):
+        """
+        Verify that SubjectRepository.get_or_create:
+        1. Includes 'created_at' in new_sub payload.
+        2. Does NOT include 'updated_at'.
+        3. Does NOT raise 'NoneType' object has no attribute 'data' when res is None or res.data is None.
+        """
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_select = MagicMock()
+        mock_insert = MagicMock()
+
+        # 1. Simulate maybe_single().execute() returning None safely without AttributeError
+        mock_select.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = None
+
+        new_subject_row = {
+            'id': 'test-sub-uuid-999',
+            'code': 'CS999',
+            'name': 'Cloud Computing',
+            'department': 'Computer Engineering',
+            'class_name': 'TE Computer',
+            'description': 'Distributed Systems and Cloud Architecture',
+            'created_at': '2026-10-27T10:00:00+00:00'
+        }
+        mock_insert.insert.return_value.execute.return_value = MagicMock(data=[new_subject_row])
+        mock_table.select = mock_select.select
+        mock_table.insert = mock_insert.insert
+        mock_supabase.table.return_value = mock_table
+
+        with patch('app.database.repositories.subject_repository.get_supabase_client', return_value=mock_supabase):
+            sub = SubjectRepository.get_or_create(
+                code='CS999',
+                name='Cloud Computing',
+                department='Computer Engineering',
+                class_name='TE Computer',
+                description='Distributed Systems and Cloud Architecture'
+            )
+
+            # Verify table called was subjects
+            mock_supabase.table.assert_any_call('subjects')
+
+            # Verify insert payload
+            insert_call_args = mock_insert.insert.call_args[0][0]
+            self.assertIn('created_at', insert_call_args, "new_sub is missing 'created_at'!")
+            self.assertIsNotNone(insert_call_args['created_at'])
+            self.assertNotIn('updated_at', insert_call_args, "new_sub must not contain 'updated_at' for Supabase!")
+
+            self.assertEqual(sub['code'], 'CS999')
+            self.assertEqual(sub['name'], 'Cloud Computing')
+
+    def test_quiz_repository_get_all_join_fallback(self):
+        """
+        Verify that if the PostgREST foreign key relationship syntax 'subjects(name)'
+        encounters an error, QuizRepository.get_all gracefully falls back to select('*')
+        without crashing the admin dashboard.
+        """
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_select = MagicMock()
+
+        quiz_row = {
+            'id': 'quiz-fallback-01',
+            'subject_id': 'c0000000-0000-0000-0000-000000000001',
+            'unit_number': 1,
+            'unit_title': 'Unit 1 Fallback',
+            'title': 'Join Fallback Quiz',
+            'class_name': 'TE Computer',
+            'division': 'All',
+            'department': 'Computer Engineering',
+            'duration_minutes': 15,
+            'question_count': 0,
+            'total_marks': 15.0,
+            'passing_percentage': 40.0,
+            'is_published': False,
+            'randomize_questions': False,
+            'randomize_options': False,
+            'created_at': '2026-10-27T00:00:00+00:00'
+        }
+
+        # First call with subjects(name) raises exception; second call with '*' succeeds
+        call_count = {'count': 0}
+        def fake_select(cols):
+            call_count['count'] += 1
+            inner = MagicMock()
+            if 'subjects(name)' in cols:
+                inner.order.return_value.execute.side_effect = RuntimeError("PGRST200 Relationship not found")
+            else:
+                inner.order.return_value.execute.return_value = MagicMock(data=[quiz_row])
+            return inner
+
+        mock_table.select = fake_select
+        mock_supabase.table.return_value = mock_table
+
+        with patch('app.database.repositories.quiz_repository.get_supabase_client', return_value=mock_supabase):
+            quizzes = QuizRepository.get_all()
+            self.assertEqual(len(quizzes), 1)
+            self.assertEqual(quizzes[0]['title'], 'Join Fallback Quiz')
+            self.assertGreaterEqual(call_count['count'], 2)
+
 if __name__ == '__main__':
     unittest.main()

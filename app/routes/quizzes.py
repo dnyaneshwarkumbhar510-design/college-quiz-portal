@@ -72,6 +72,8 @@ def api_quizzes():
             'message': 'Quiz created successfully'
         }), 201
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("Failed to create quiz: %s", e, exc_info=True)
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @quizzes_bp.route('/api/admin/quizzes/<quiz_id>', methods=['GET', 'PUT', 'PATCH', 'DELETE'])

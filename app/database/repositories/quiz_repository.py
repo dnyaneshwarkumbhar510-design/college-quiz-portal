@@ -49,19 +49,40 @@ class QuizRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
-                query = supabase.table('quizzes').select('*, subjects(name)')
-                if subject_id:
-                    query = query.eq('subject_id', str(subject_id).strip())
-                res = query.order('created_at', desc=True).execute()
-                rows = res.data or []
-                
+                try:
+                    query = supabase.table('quizzes').select('*, subjects(name)')
+                    if subject_id:
+                        query = query.eq('subject_id', str(subject_id).strip())
+                    res = query.order('created_at', desc=True).execute()
+                    rows = (res.data if res is not None and getattr(res, 'data', None) else []) or []
+                except Exception as join_err:
+                    logger.warning("Supabase quizzes join with subjects failed, falling back to select('*'): %s", join_err)
+                    query = supabase.table('quizzes').select('*')
+                    if subject_id:
+                        query = query.eq('subject_id', str(subject_id).strip())
+                    res = query.order('created_at', desc=True).execute()
+                    rows = (res.data if res is not None and getattr(res, 'data', None) else []) or []
+
+                # Build subject name lookup if any quiz is missing joined subject name
+                sub_map = {}
+                for q in rows:
+                    if not q.get('subjects') and q.get('subject_id'):
+                        if not sub_map:
+                            try:
+                                for s in SubjectRepository.get_all():
+                                    sub_map[s['id']] = s.get('name')
+                            except Exception:
+                                pass
+                        if q.get('subject_id') in sub_map:
+                            q['sub_name'] = sub_map[q['subject_id']]
+
                 result = []
                 for q in rows:
                     q_norm = QuizRepository._normalize_quiz(q)
                     # Fetch live question count from questions table (authoritative in Supabase schema)
                     try:
                         q_res = supabase.table('questions').select('id', count='exact', head=True).eq('quiz_id', q_norm['id']).execute()
-                        if q_res.count is not None:
+                        if q_res is not None and getattr(q_res, 'count', None) is not None:
                             q_norm['question_count'] = q_res.count
                             q_norm['total_questions'] = q_res.count
                     except Exception as count_err:
@@ -115,13 +136,24 @@ class QuizRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
-                res = supabase.table('quizzes').select('*, subjects(name)').eq('id', clean_id).maybe_single().execute()
-                if not res.data:
+                try:
+                    res = supabase.table('quizzes').select('*, subjects(name)').eq('id', clean_id).maybe_single().execute()
+                except Exception as join_err:
+                    logger.warning("Supabase quiz get_by_id join failed, falling back to select('*'): %s", join_err)
+                    res = supabase.table('quizzes').select('*').eq('id', clean_id).maybe_single().execute()
+
+                if not res or not getattr(res, 'data', None):
                     return None
                 q_norm = QuizRepository._normalize_quiz(res.data)
+                if q_norm.get('subject_name') == 'General Subject' and q_norm.get('subject_id'):
+                    sub_row = SubjectRepository.get_by_id(q_norm['subject_id'])
+                    if sub_row and sub_row.get('name'):
+                        q_norm['subject_name'] = sub_row['name']
+                        q_norm['subject'] = sub_row['name']
+
                 try:
                     q_res = supabase.table('questions').select('id', count='exact', head=True).eq('quiz_id', clean_id).execute()
-                    if q_res.count is not None:
+                    if q_res is not None and getattr(q_res, 'count', None) is not None:
                         q_norm['question_count'] = q_res.count
                         q_norm['total_questions'] = q_res.count
                 except Exception as count_err:
@@ -174,6 +206,26 @@ class QuizRepository:
                 )
                 subject_id = str(new_sub['id'])
                 data['subject_name'] = new_sub['name']
+        else:
+            # Check whether subject_id exists in active database
+            existing_sub = SubjectRepository.get_by_id(subject_id)
+            if not existing_sub:
+                all_subs = SubjectRepository.get_all()
+                if all_subs:
+                    subject_id = str(all_subs[0]['id'])
+                    data['subject_name'] = all_subs[0]['name']
+                else:
+                    new_sub = SubjectRepository.get_or_create(
+                        code='CS301',
+                        name='Data Structures & Algorithms',
+                        department=data.get('department', 'Computer Engineering'),
+                        class_name=data.get('class_name', 'TE Computer')
+                    )
+                    subject_id = str(new_sub['id'])
+                    data['subject_name'] = new_sub['name']
+            else:
+                if not data.get('subject_name'):
+                    data['subject_name'] = existing_sub.get('name')
 
         # 2. Clamped unit number for institutional 4-unit curriculum
         try:
@@ -199,7 +251,7 @@ class QuizRepository:
                     .maybe_single()\
                     .execute()
                 
-                if exist_res and exist_res.data:
+                if exist_res and getattr(exist_res, 'data', None):
                     ex_quiz = exist_res.data
                     # If existing quiz has 0 questions and is not published, reuse and update it
                     if (ex_quiz.get('question_count') or 0) == 0 and not ex_quiz.get('is_published'):
@@ -249,7 +301,7 @@ class QuizRepository:
 
             try:
                 res = supabase.table('quizzes').insert(supabase_payload).execute()
-                if not res.data or len(res.data) == 0:
+                if not res or not getattr(res, 'data', None) or len(res.data) == 0:
                     raise RuntimeError("Supabase returned empty response upon quiz creation")
                 created = QuizRepository._normalize_quiz(res.data[0])
                 created['is_published'] = is_pub

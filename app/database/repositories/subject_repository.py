@@ -13,7 +13,8 @@ class SubjectRepository:
             'name': 'Data Structures & Algorithms',
             'department': 'Computer Engineering',
             'class_name': 'TE Computer',
-            'description': 'Linear and non-linear data structures, trees, graphs, sorting, and asymptotic analysis.'
+            'description': 'Linear and non-linear data structures, trees, graphs, sorting, and asymptotic analysis.',
+            'created_at': '2026-01-01T00:00:00+00:00'
         },
         {
             'id': 'c0000000-0000-0000-0000-000000000002',
@@ -21,7 +22,8 @@ class SubjectRepository:
             'name': 'Database Management Systems',
             'department': 'Computer Engineering',
             'class_name': 'TE Computer',
-            'description': 'Relational database architecture, SQL, relational calculus, normalization, and concurrency control.'
+            'description': 'Relational database architecture, SQL, relational calculus, normalization, and concurrency control.',
+            'created_at': '2026-01-01T00:00:00+00:00'
         }
     ]
 
@@ -31,11 +33,11 @@ class SubjectRepository:
         if supabase:
             try:
                 res = supabase.table('subjects').select('*').order('name', desc=False).execute()
-                rows = res.data or []
+                rows = (res.data if res is not None and getattr(res, 'data', None) else []) or []
                 if not rows:
                     SubjectRepository._seed_defaults_supabase(supabase)
                     res = supabase.table('subjects').select('*').order('name', desc=False).execute()
-                    rows = res.data or []
+                    rows = (res.data if res is not None and getattr(res, 'data', None) else []) or []
                 return rows
             except Exception as e:
                 logger.error("Supabase get_all subjects error: %s", e)
@@ -55,10 +57,33 @@ class SubjectRepository:
 
     @staticmethod
     def _seed_defaults_supabase(supabase):
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         try:
             for s in SubjectRepository.DEFAULT_SUBJECTS:
-                supabase.table('subjects').upsert(s).execute()
-            logger.info("Default subjects seeded successfully in Supabase.")
+                try:
+                    # Check if subject with this code or id already exists
+                    existing_code = supabase.table('subjects').select('id, code').eq('code', s['code']).maybe_single().execute()
+                    if existing_code is not None and getattr(existing_code, 'data', None):
+                        continue
+                    existing_id = supabase.table('subjects').select('id').eq('id', s['id']).maybe_single().execute()
+                    if existing_id is not None and getattr(existing_id, 'data', None):
+                        continue
+
+                    # Exact columns matching public.subjects in Supabase PostgreSQL schema
+                    # Note: public.subjects does NOT have updated_at
+                    seed_item = {
+                        'id': s['id'],
+                        'code': s['code'],
+                        'name': s['name'],
+                        'department': s.get('department', 'Computer Engineering'),
+                        'class_name': s.get('class_name', 'TE Computer'),
+                        'description': s.get('description', ''),
+                        'created_at': s.get('created_at') or now
+                    }
+                    supabase.table('subjects').insert(seed_item).execute()
+                except Exception as item_err:
+                    logger.warning("Could not auto-seed default subject %s in Supabase: %s", s.get('code'), item_err)
+            logger.info("Default subjects auto-seeding completed in Supabase.")
         except Exception as e:
             logger.warning("Could not auto-seed default subjects in Supabase: %s", e)
 
@@ -69,7 +94,7 @@ class SubjectRepository:
             cursor.execute("""
             INSERT OR IGNORE INTO subjects (id, code, name, department, class_name, description, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (s['id'], s['code'], s['name'], s['department'], s['class_name'], s['description'], now, now))
+            """, (s['id'], s['code'], s['name'], s['department'], s['class_name'], s['description'], s.get('created_at') or now, now))
 
     @staticmethod
     def get_by_id(subject_id):
@@ -80,7 +105,9 @@ class SubjectRepository:
         if supabase:
             try:
                 res = supabase.table('subjects').select('*').eq('id', clean_id).maybe_single().execute()
-                return res.data
+                if res is not None and getattr(res, 'data', None):
+                    return res.data
+                return None
             except Exception as e:
                 logger.error("Supabase get subject by id error: %s", e)
                 raise
@@ -112,26 +139,43 @@ class SubjectRepository:
         if supabase:
             try:
                 res = supabase.table('subjects').select('*').eq('code', clean_code).maybe_single().execute()
-                if res.data:
+                if res is not None and getattr(res, 'data', None):
                     return res.data
                 
                 sub_id = str(uuid.uuid4())
-                # Exact columns matching Supabase PostgreSQL schema (without updated_at)
+                # Exact columns matching Supabase PostgreSQL schema (created_at included, NO updated_at)
                 new_sub = {
                     'id': sub_id,
                     'code': clean_code,
                     'name': clean_name,
                     'department': department,
                     'class_name': class_name,
-                    'description': description
+                    'description': description,
+                    'created_at': now
                 }
                 insert_res = supabase.table('subjects').insert(new_sub).execute()
-                if insert_res.data and len(insert_res.data) > 0:
-                    return insert_res.data[0]
+                if insert_res is not None and getattr(insert_res, 'data', None):
+                    d = insert_res.data
+                    if isinstance(d, list) and len(d) > 0:
+                        return d[0]
+                    elif isinstance(d, dict):
+                        return d
+                
+                # If insert response data was empty, query by code
+                verify_res = supabase.table('subjects').select('*').eq('code', clean_code).maybe_single().execute()
+                if verify_res is not None and getattr(verify_res, 'data', None):
+                    return verify_res.data
                 return new_sub
             except Exception as e:
                 logger.error("Supabase get_or_create subject error: %s", e)
-                raise
+                # Race condition / concurrent insert handling: check if created by another request
+                try:
+                    retry_res = supabase.table('subjects').select('*').eq('code', clean_code).maybe_single().execute()
+                    if retry_res is not None and getattr(retry_res, 'data', None):
+                        return retry_res.data
+                except Exception as retry_err:
+                    logger.debug("Retry lookup after error also failed: %s", retry_err)
+                raise RuntimeError(f"Database error in subject lookup/creation: {e}")
 
         conn = get_db_connection()
         cursor = conn.cursor()
