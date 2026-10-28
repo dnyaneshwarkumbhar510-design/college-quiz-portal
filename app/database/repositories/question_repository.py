@@ -14,26 +14,76 @@ class QuestionRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
-                # Query questions directly by quiz_id (authoritative Supabase schema)
-                res = supabase.table('questions')\
-                    .select('*')\
+                # 1. Query associations from authoritative quiz_questions join table
+                qq_res = supabase.table('quiz_questions')\
+                    .select('id, quiz_id, question_id, question_order, created_at')\
                     .eq('quiz_id', clean_id)\
-                    .order('created_at', desc=False)\
+                    .order('question_order', desc=False)\
                     .execute()
                 
+                qq_rows = qq_res.data or []
+                if not qq_rows:
+                    return []
+                
+                q_ids = [r['question_id'] for r in qq_rows if r.get('question_id')]
+                if not q_ids:
+                    return []
+
+                # 2. Fetch the corresponding questions by IDs
+                q_res = supabase.table('questions')\
+                    .select('*')\
+                    .in_('id', q_ids)\
+                    .execute()
+                
+                q_map = {q['id']: q for q in (q_res.data or [])}
                 rows = []
-                for idx, q in enumerate(res.data or []):
-                    q_copy = dict(q)
-                    q_copy['quiz_id'] = clean_id
-                    q_copy['question_order'] = idx + 1
-                    rows.append(q_copy)
+                for idx, qq in enumerate(qq_rows):
+                    qid = qq.get('question_id')
+                    if qid in q_map:
+                        q_copy = dict(q_map[qid])
+                        q_copy['quiz_id'] = clean_id
+                        q_copy['question_order'] = qq.get('question_order') or (idx + 1)
+                        q_copy['quiz_question_id'] = qq.get('id')
+                        rows.append(q_copy)
                 return rows
             except Exception as e:
-                logger.error("Supabase get questions for quiz %s error: %s", clean_id, e)
-                raise RuntimeError(f"Database error loading questions: {e}")
+                # Fallback: if quiz_questions query fails (e.g. table missing in legacy schema), try legacy questions.quiz_id
+                try:
+                    res = supabase.table('questions')\
+                        .select('*')\
+                        .eq('quiz_id', clean_id)\
+                        .order('created_at', desc=False)\
+                        .execute()
+                    rows = []
+                    for idx, q in enumerate(res.data or []):
+                        q_copy = dict(q)
+                        q_copy['quiz_id'] = clean_id
+                        q_copy['question_order'] = idx + 1
+                        rows.append(q_copy)
+                    return rows
+                except Exception:
+                    logger.error("Supabase get questions for quiz %s error: %s", clean_id, e)
+                    raise RuntimeError(f"Database error loading questions: {e}")
 
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Check if quiz_questions table exists
+        cursor.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='quiz_questions'")
+        has_qq = cursor.fetchone()[0] > 0
+        
+        if has_qq:
+            cursor.execute("""
+            SELECT q.*, qq.quiz_id, qq.question_order, qq.id as quiz_question_id
+            FROM questions q
+            JOIN quiz_questions qq ON q.id = qq.question_id
+            WHERE qq.quiz_id = ?
+            ORDER BY qq.question_order ASC, q.created_at ASC
+            """, (clean_id,))
+            rows = [dict(r) for r in cursor.fetchall()]
+            if rows:
+                conn.close()
+                return rows
         
         # Check if quiz_id column exists on questions table
         cursor.execute("PRAGMA table_info(questions)")
@@ -53,17 +103,9 @@ class QuestionRepository:
                 rows.append(d)
             conn.close()
             return rows
-        else:
-            cursor.execute("""
-            SELECT q.*, qq.quiz_id, qq.question_order
-            FROM questions q
-            JOIN quiz_questions qq ON q.id = qq.question_id
-            WHERE qq.quiz_id = ?
-            ORDER BY qq.question_order ASC, q.created_at ASC
-            """, (clean_id,))
-            rows = [dict(r) for r in cursor.fetchall()]
-            conn.close()
-            return rows
+        
+        conn.close()
+        return []
 
     get_questions_by_quiz_id = get_by_quiz
 
@@ -74,7 +116,19 @@ class QuestionRepository:
         if supabase:
             try:
                 res = supabase.table('questions').select('*').eq('id', clean_id).maybe_single().execute()
-                return res.data
+                if not res or not res.data:
+                    return None
+                q_data = dict(res.data)
+                # Look up quiz_id and question_order from quiz_questions if not in questions
+                if not q_data.get('quiz_id'):
+                    try:
+                        qq_res = supabase.table('quiz_questions').select('quiz_id, question_order').eq('question_id', clean_id).limit(1).execute()
+                        if qq_res.data and len(qq_res.data) > 0:
+                            q_data['quiz_id'] = qq_res.data[0].get('quiz_id')
+                            q_data['question_order'] = qq_res.data[0].get('question_order', 1)
+                    except Exception as qq_err:
+                        logger.debug("quiz_questions lookup for question %s: %s", clean_id, qq_err)
+                return q_data
             except Exception as e:
                 logger.error("Supabase get question by id error: %s", e)
                 raise
@@ -83,8 +137,21 @@ class QuestionRepository:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM questions WHERE id = ?", (clean_id,))
         row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return None
+        q_data = dict(row)
+        if not q_data.get('quiz_id'):
+            try:
+                cursor.execute("SELECT quiz_id, question_order FROM quiz_questions WHERE question_id = ? LIMIT 1", (clean_id,))
+                qq_row = cursor.fetchone()
+                if qq_row:
+                    q_data['quiz_id'] = qq_row['quiz_id']
+                    q_data['question_order'] = qq_row['question_order']
+            except Exception:
+                pass
         conn.close()
-        return dict(row) if row else None
+        return q_data
 
     @staticmethod
     def get_student_exam_questions(quiz_id):
@@ -152,10 +219,9 @@ class QuestionRepository:
 
         supabase = get_supabase_client()
         if supabase:
-            # Standard Supabase questions payload matching 01_schema.sql
+            # Standard Supabase questions payload matching public.questions (without quiz_id)
             supabase_q_payload = {
                 'id': question_id,
-                'quiz_id': clean_quiz_id,
                 'question_text': clean_text,
                 'option_a': clean_opt_a,
                 'option_b': clean_opt_b,
@@ -164,19 +230,58 @@ class QuestionRepository:
                 'correct_answer': clean_correct,
                 'marks': clean_marks,
                 'explanation': clean_expl,
-                'created_at': now
+                'created_at': now,
+                'updated_at': now
             }
+            if data.get('created_by'):
+                supabase_q_payload['created_by'] = str(data['created_by']).strip()
 
             try:
-                q_res = supabase.table('questions').insert(supabase_q_payload).execute()
+                try:
+                    q_res = supabase.table('questions').insert(supabase_q_payload).execute()
+                except Exception as ins_err:
+                    # In case of legacy schema expecting quiz_id on questions table
+                    if 'quiz_id' in str(ins_err):
+                        fallback_payload = dict(supabase_q_payload)
+                        fallback_payload['quiz_id'] = clean_quiz_id
+                        q_res = supabase.table('questions').insert(fallback_payload).execute()
+                    else:
+                        raise
+
                 if not q_res.data or len(q_res.data) == 0:
                     raise RuntimeError("Failed to insert question in Supabase.")
+
+                # Insert into authoritative quiz_questions join table
+                order = 1
+                try:
+                    qq_count = supabase.table('quiz_questions')\
+                        .select('id', count='exact', head=True)\
+                        .eq('quiz_id', clean_quiz_id)\
+                        .execute()
+                    if qq_count is not None and getattr(qq_count, 'count', None) is not None:
+                        order = qq_count.count + 1
+                except Exception:
+                    pass
+
+                join_id = str(uuid.uuid4())
+                join_payload = {
+                    'id': join_id,
+                    'quiz_id': clean_quiz_id,
+                    'question_id': question_id,
+                    'question_order': order,
+                    'created_at': now
+                }
+                try:
+                    supabase.table('quiz_questions').insert(join_payload).execute()
+                except Exception as qq_err:
+                    logger.warning("Could not insert into quiz_questions: %s", qq_err)
 
                 # Recalculate totals on parent quiz
                 QuizRepository.recalculate_totals(clean_quiz_id)
 
                 inserted_q = dict(q_res.data[0])
                 inserted_q['quiz_id'] = clean_quiz_id
+                inserted_q['question_order'] = order
                 return inserted_q
             except Exception as e:
                 logger.error("Supabase create_question error: %s", e)
@@ -253,6 +358,7 @@ class QuestionRepository:
         if 'correct_answer' in data: update_fields['correct_answer'] = str(data['correct_answer']).strip().upper()
         if 'marks' in data: update_fields['marks'] = max(0.5, min(10.0, float(data['marks'])))
         if 'explanation' in data: update_fields['explanation'] = str(data['explanation'] or '').strip() or None
+        update_fields['updated_at'] = now
 
         supabase = get_supabase_client()
         if supabase:
@@ -262,9 +368,17 @@ class QuestionRepository:
                     raise RuntimeError("Question not found in database.")
 
                 # Recalculate totals for parent quiz
-                updated_q = res.data[0]
-                if updated_q.get('quiz_id'):
-                    QuizRepository.recalculate_totals(updated_q['quiz_id'])
+                target_quiz_id = data.get('quiz_id')
+                if not target_quiz_id:
+                    try:
+                        qq_res = supabase.table('quiz_questions').select('quiz_id').eq('question_id', clean_id).execute()
+                        if qq_res.data and len(qq_res.data) > 0:
+                            target_quiz_id = qq_res.data[0].get('quiz_id')
+                    except Exception:
+                        pass
+                
+                if target_quiz_id:
+                    QuizRepository.recalculate_totals(target_quiz_id)
 
                 return QuestionRepository.get_by_id(clean_id)
             except Exception as e:
@@ -277,22 +391,37 @@ class QuestionRepository:
         set_clauses = ["updated_at = ?"]
         params = [now]
         for k, v in update_fields.items():
-            set_clauses.append(f"{k} = ?")
-            params.append(v)
+            if k != 'updated_at':
+                set_clauses.append(f"{k} = ?")
+                params.append(v)
         params.append(clean_id)
 
         cursor.execute(f"UPDATE questions SET {', '.join(set_clauses)} WHERE id = ?", params)
         
         # Get affected quiz
-        cursor.execute("SELECT quiz_id FROM questions WHERE id = ?", (clean_id,))
-        row = cursor.fetchone()
-        quiz_id = row['quiz_id'] if row and 'quiz_id' in row.keys() else None
+        target_quiz_id = data.get('quiz_id')
+        if not target_quiz_id:
+            try:
+                cursor.execute("SELECT quiz_id FROM quiz_questions WHERE question_id = ?", (clean_id,))
+                row2 = cursor.fetchone()
+                if row2:
+                    target_quiz_id = row2[0]
+            except Exception:
+                pass
+            if not target_quiz_id:
+                cursor.execute("PRAGMA table_info(questions)")
+                q_cols = [c['name'] for c in cursor.fetchall()]
+                if 'quiz_id' in q_cols:
+                    cursor.execute("SELECT quiz_id FROM questions WHERE id = ?", (clean_id,))
+                    row = cursor.fetchone()
+                    if row and row['quiz_id']:
+                        target_quiz_id = row['quiz_id']
         
         conn.commit()
         conn.close()
 
-        if quiz_id:
-            QuizRepository.recalculate_totals(quiz_id)
+        if target_quiz_id:
+            QuizRepository.recalculate_totals(target_quiz_id)
 
         return QuestionRepository.get_by_id(clean_id)
 
@@ -304,17 +433,45 @@ class QuestionRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
-                # If quiz_id not provided, look it up first
-                if not clean_quiz_id:
-                    q_res = supabase.table('questions').select('quiz_id').eq('id', clean_qid).maybe_single().execute()
-                    if q_res.data:
-                        clean_quiz_id = q_res.data.get('quiz_id')
-
-                supabase.table('questions').delete().eq('id', clean_qid).execute()
-
                 if clean_quiz_id:
+                    # Remove association from quiz_questions
+                    try:
+                        supabase.table('quiz_questions').delete().eq('quiz_id', clean_quiz_id).eq('question_id', clean_qid).execute()
+                    except Exception as qq_err:
+                        logger.warning("Error deleting from quiz_questions: %s", qq_err)
+
+                    # If this question is not linked to any other quiz, delete from questions table
+                    try:
+                        rem_res = supabase.table('quiz_questions').select('id', count='exact', head=True).eq('question_id', clean_qid).execute()
+                        if rem_res is not None and getattr(rem_res, 'count', None) == 0:
+                            supabase.table('questions').delete().eq('id', clean_qid).execute()
+                    except Exception:
+                        try:
+                            supabase.table('questions').delete().eq('id', clean_qid).execute()
+                        except Exception:
+                            pass
+
                     QuizRepository.recalculate_totals(clean_quiz_id)
-                return True
+                    return True
+                else:
+                    # No specific quiz_id: find all affected quizzes first
+                    affected_quizzes = []
+                    try:
+                        qq_res = supabase.table('quiz_questions').select('quiz_id').eq('question_id', clean_qid).execute()
+                        affected_quizzes = [r['quiz_id'] for r in (qq_res.data or []) if r.get('quiz_id')]
+                    except Exception:
+                        pass
+
+                    try:
+                        supabase.table('quiz_questions').delete().eq('question_id', clean_qid).execute()
+                    except Exception:
+                        pass
+
+                    supabase.table('questions').delete().eq('id', clean_qid).execute()
+
+                    for qz_id in affected_quizzes:
+                        QuizRepository.recalculate_totals(qz_id)
+                    return True
             except Exception as e:
                 logger.error("Supabase delete_question error: %s", e)
                 raise RuntimeError(f"Database error deleting question: {e}")
@@ -323,15 +480,21 @@ class QuestionRepository:
         cursor = conn.cursor()
         
         if not clean_quiz_id:
-            cursor.execute("SELECT quiz_id FROM questions WHERE id = ?", (clean_qid,))
-            row = cursor.fetchone()
-            if row and 'quiz_id' in row.keys() and row['quiz_id']:
-                clean_quiz_id = row['quiz_id']
-            else:
+            try:
                 cursor.execute("SELECT quiz_id FROM quiz_questions WHERE question_id = ?", (clean_qid,))
                 row2 = cursor.fetchone()
                 if row2:
                     clean_quiz_id = row2[0]
+            except Exception:
+                pass
+            if not clean_quiz_id:
+                cursor.execute("PRAGMA table_info(questions)")
+                q_cols = [c['name'] for c in cursor.fetchall()]
+                if 'quiz_id' in q_cols:
+                    cursor.execute("SELECT quiz_id FROM questions WHERE id = ?", (clean_qid,))
+                    row = cursor.fetchone()
+                    if row and row['quiz_id']:
+                        clean_quiz_id = row['quiz_id']
 
         try:
             cursor.execute("DELETE FROM quiz_questions WHERE question_id = ?", (clean_qid,))

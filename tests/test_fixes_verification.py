@@ -798,5 +798,249 @@ class TestFixesVerification(unittest.TestCase):
                 self.assertEqual(actual_update_payload['published'], 1)
                 self.assertEqual(actual_update_payload['status'], 'published')
 
+    def test_question_get_by_quiz_uses_quiz_questions_join_table(self):
+        """
+        Regression test: Verify QuestionRepository.get_by_quiz loads questions via
+        authoritative quiz_questions join table and does NOT assume questions.quiz_id
+        exists in Supabase schema.
+        """
+        mock_supabase = MagicMock()
+        mock_qq_table = MagicMock()
+        mock_q_table = MagicMock()
+
+        # Mock quiz_questions response
+        qq_rows = [
+            {'id': 'qq-uuid-1', 'quiz_id': 'quiz-uuid-999', 'question_id': 'q-uuid-1', 'question_order': 1},
+            {'id': 'qq-uuid-2', 'quiz_id': 'quiz-uuid-999', 'question_id': 'q-uuid-2', 'question_order': 2}
+        ]
+        qq_select_mock = MagicMock()
+        qq_select_mock.eq.return_value.order.return_value.execute.return_value = MagicMock(data=qq_rows)
+        mock_qq_table.select.return_value = qq_select_mock
+
+        # Mock questions response (note questions table in Supabase does NOT have quiz_id column)
+        q_rows = [
+            {'id': 'q-uuid-1', 'question_text': 'What is a stack?', 'option_a': 'LIFO', 'option_b': 'FIFO', 'option_c': 'Tree', 'option_d': 'Graph', 'correct_answer': 'A', 'marks': 1.0},
+            {'id': 'q-uuid-2', 'question_text': 'What is a queue?', 'option_a': 'LIFO', 'option_b': 'FIFO', 'option_c': 'Tree', 'option_d': 'Graph', 'correct_answer': 'B', 'marks': 2.0}
+        ]
+        q_select_mock = MagicMock()
+        q_select_mock.in_.return_value.execute.return_value = MagicMock(data=q_rows)
+        mock_q_table.select.return_value = q_select_mock
+
+        def table_router(table_name):
+            if table_name == 'quiz_questions':
+                return mock_qq_table
+            elif table_name == 'questions':
+                return mock_q_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        with patch('app.database.repositories.question_repository.get_supabase_client', return_value=mock_supabase):
+            questions = QuestionRepository.get_by_quiz('quiz-uuid-999')
+
+            # Verify quiz_questions table was queried
+            mock_qq_table.select.assert_called_with('id, quiz_id, question_id, question_order, created_at')
+            qq_select_mock.eq.assert_called_with('quiz_id', 'quiz-uuid-999')
+
+            # Verify questions table was queried via .in_() on IDs
+            mock_q_table.select.assert_called_with('*')
+            q_select_mock.in_.assert_called_with('id', ['q-uuid-1', 'q-uuid-2'])
+
+            # Verify results are properly populated with quiz_id and preserved question_order
+            self.assertEqual(len(questions), 2)
+            self.assertEqual(questions[0]['id'], 'q-uuid-1')
+            self.assertEqual(questions[0]['quiz_id'], 'quiz-uuid-999')
+            self.assertEqual(questions[0]['question_order'], 1)
+            self.assertEqual(questions[1]['id'], 'q-uuid-2')
+            self.assertEqual(questions[1]['quiz_id'], 'quiz-uuid-999')
+            self.assertEqual(questions[1]['question_order'], 2)
+
+    def test_question_create_does_not_pass_quiz_id_to_questions_table_and_inserts_quiz_questions(self):
+        """
+        Regression test: Verify QuestionRepository.create_question does NOT pass
+        'quiz_id' to public.questions table insert, and properly creates a link
+        in public.quiz_questions.
+        """
+        mock_supabase = MagicMock()
+        mock_qq_table = MagicMock()
+        mock_q_table = MagicMock()
+
+        # Mock count query on quiz_questions
+        mock_count_exec = MagicMock(count=0)
+        mock_qq_table.select.return_value.eq.return_value.execute.return_value = mock_count_exec
+        mock_qq_table.insert.return_value.execute.return_value = MagicMock(data=[{'id': 'qq-uuid-new'}])
+
+        # Mock questions table insert
+        inserted_q_row = {
+            'id': 'new-question-uuid',
+            'question_text': 'What is encapsulation?',
+            'option_a': 'Data hiding',
+            'option_b': 'Inheritance',
+            'option_c': 'Polymorphism',
+            'option_d': 'Overloading',
+            'correct_answer': 'A',
+            'marks': 2.0,
+            'explanation': 'Encapsulation binds data and code.',
+            'created_at': '2026-10-28T00:00:00+00:00',
+            'updated_at': '2026-10-28T00:00:00+00:00'
+        }
+        mock_q_table.insert.return_value.execute.return_value = MagicMock(data=[inserted_q_row])
+
+        def table_router(table_name):
+            if table_name == 'quiz_questions':
+                return mock_qq_table
+            elif table_name == 'questions':
+                return mock_q_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        fake_quiz = {
+            'id': 'quiz-uuid-999',
+            'title': 'Test Quiz',
+            'total_questions': 0
+        }
+
+        with patch('app.database.repositories.question_repository.get_supabase_client', return_value=mock_supabase):
+            with patch('app.database.repositories.question_repository.QuizRepository.get_by_id', return_value=fake_quiz):
+                with patch('app.database.repositories.question_repository.QuizRepository.recalculate_totals', return_value=(1, 2.0)):
+                    result = QuestionRepository.create_question({
+                        'quiz_id': 'quiz-uuid-999',
+                        'question_text': 'What is encapsulation?',
+                        'option_a': 'Data hiding',
+                        'option_b': 'Inheritance',
+                        'option_c': 'Polymorphism',
+                        'option_d': 'Overloading',
+                        'correct_answer': 'A',
+                        'marks': 2.0,
+                        'explanation': 'Encapsulation binds data and code.'
+                    })
+
+                    # Verify questions insert payload
+                    actual_q_payload = mock_q_table.insert.call_args[0][0]
+                    self.assertNotIn('quiz_id', actual_q_payload, "quiz_id MUST NOT be passed to public.questions table insert!")
+                    self.assertEqual(actual_q_payload['question_text'], 'What is encapsulation?')
+                    self.assertEqual(actual_q_payload['correct_answer'], 'A')
+                    self.assertEqual(actual_q_payload['marks'], 2.0)
+
+                    # Verify quiz_questions insert payload
+                    actual_qq_payload = mock_qq_table.insert.call_args[0][0]
+                    self.assertEqual(actual_qq_payload['quiz_id'], 'quiz-uuid-999')
+                    self.assertEqual(actual_qq_payload['question_id'], actual_q_payload['id'])
+                    self.assertEqual(actual_qq_payload['question_order'], 1)
+
+                    # Verify returned question object has quiz_id and question_order
+                    self.assertEqual(result['quiz_id'], 'quiz-uuid-999')
+                    self.assertEqual(result['question_order'], 1)
+
+    def test_quiz_repository_recalculate_totals_uses_quiz_questions(self):
+        """
+        Regression test: Verify QuizRepository.recalculate_totals queries quiz_questions
+        join table first and does NOT fail when questions.quiz_id does not exist.
+        """
+        mock_supabase = MagicMock()
+        mock_qq_table = MagicMock()
+        mock_q_table = MagicMock()
+        mock_quizzes_table = MagicMock()
+
+        # Mock quiz_questions response
+        mock_qq_table.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[
+            {'question_id': 'q-1'},
+            {'question_id': 'q-2'}
+        ])
+
+        # Mock questions response for marks
+        mock_q_table.select.return_value.in_.return_value.execute.return_value = MagicMock(data=[
+            {'marks': 2.5},
+            {'marks': 3.5}
+        ])
+
+        # Mock quizzes table update
+        mock_quizzes_table.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+        def table_router(table_name):
+            if table_name == 'quiz_questions':
+                return mock_qq_table
+            elif table_name == 'questions':
+                return mock_q_table
+            elif table_name == 'quizzes':
+                return mock_quizzes_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        with patch('app.database.repositories.quiz_repository.get_supabase_client', return_value=mock_supabase):
+            q_count, t_marks = QuizRepository.recalculate_totals('quiz-uuid-999')
+
+            self.assertEqual(q_count, 2)
+            self.assertEqual(t_marks, 6.0)
+
+            # Verify quizzes table updated with total_questions = 2 and total_marks = 6
+            update_payload = mock_quizzes_table.update.call_args[0][0]
+            self.assertEqual(update_payload['total_questions'], 2)
+            self.assertEqual(update_payload['total_marks'], 6)
+
+    def test_question_delete_removes_from_quiz_questions(self):
+        """
+        Regression test: Verify QuestionRepository.delete_question removes association
+        from quiz_questions table and recalculates totals.
+        """
+        mock_supabase = MagicMock()
+        mock_qq_table = MagicMock()
+        mock_q_table = MagicMock()
+
+        mock_qq_table.delete.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+        mock_qq_table.select.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
+        mock_q_table.delete.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+        def table_router(table_name):
+            if table_name == 'quiz_questions':
+                return mock_qq_table
+            elif table_name == 'questions':
+                return mock_q_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        with patch('app.database.repositories.question_repository.get_supabase_client', return_value=mock_supabase):
+            with patch('app.database.repositories.question_repository.QuizRepository.recalculate_totals') as mock_recalc:
+                result = QuestionRepository.delete_question('q-uuid-del', 'quiz-uuid-999')
+                self.assertTrue(result)
+                mock_recalc.assert_called_with('quiz-uuid-999')
+
+    def test_quiz_repository_question_counts_use_quiz_questions(self):
+        """
+        Regression test: Verify QuizRepository.get_all and get_by_id query quiz_questions
+        for question counts.
+        """
+        mock_supabase = MagicMock()
+        mock_qq_table = MagicMock()
+        mock_quizzes_table = MagicMock()
+
+        mock_quizzes_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data={
+            'id': 'quiz-uuid-count',
+            'title': 'Count Test Quiz',
+            'total_questions': 0
+        })
+
+        mock_qq_count_exec = MagicMock(count=4)
+        mock_qq_table.select.return_value.eq.return_value.execute.return_value = mock_qq_count_exec
+
+        def table_router(table_name):
+            if table_name == 'quiz_questions':
+                return mock_qq_table
+            elif table_name == 'quizzes':
+                return mock_quizzes_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        with patch('app.database.repositories.quiz_repository.get_supabase_client', return_value=mock_supabase):
+            quiz = QuizRepository.get_by_id('quiz-uuid-count')
+            self.assertIsNotNone(quiz)
+            self.assertEqual(quiz['question_count'], 4)
+            self.assertEqual(quiz['total_questions'], 4)
+            mock_qq_table.select.assert_called_with('id', count='exact', head=True)
+
 if __name__ == '__main__':
     unittest.main()

@@ -81,14 +81,20 @@ class QuizRepository:
                 result = []
                 for q in rows:
                     q_norm = QuizRepository._normalize_quiz(q)
-                    # Fetch live question count from questions table (authoritative in Supabase schema)
+                    # Fetch live question count from quiz_questions table (authoritative in Supabase schema)
                     try:
-                        q_res = supabase.table('questions').select('id', count='exact', head=True).eq('quiz_id', q_norm['id']).execute()
+                        q_res = supabase.table('quiz_questions').select('id', count='exact', head=True).eq('quiz_id', q_norm['id']).execute()
                         if q_res is not None and getattr(q_res, 'count', None) is not None:
                             q_norm['question_count'] = q_res.count
                             q_norm['total_questions'] = q_res.count
                     except Exception as count_err:
-                        logger.debug("Count lookup on questions table failed, using quiz row count: %s", count_err)
+                        try:
+                            q_res = supabase.table('questions').select('id', count='exact', head=True).eq('quiz_id', q_norm['id']).execute()
+                            if q_res is not None and getattr(q_res, 'count', None) is not None:
+                                q_norm['question_count'] = q_res.count
+                                q_norm['total_questions'] = q_res.count
+                        except Exception:
+                            logger.debug("Count lookup on quiz_questions failed, using quiz row count: %s", count_err)
                     
                     result.append(q_norm)
                 return result
@@ -99,13 +105,25 @@ class QuizRepository:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        sql = """
-        SELECT q.*, s.name as sub_name,
-               (SELECT COUNT(*) FROM questions ques WHERE ques.quiz_id = q.id) as q_count,
-               (SELECT COALESCE(SUM(ques.marks), 0) FROM questions ques WHERE ques.quiz_id = q.id) as calc_marks
-        FROM quizzes q
-        LEFT JOIN subjects s ON q.subject_id = s.id
-        """
+        cursor.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='quiz_questions'")
+        has_qq = cursor.fetchone()[0] > 0
+        
+        if has_qq:
+            sql = """
+            SELECT q.*, s.name as sub_name,
+                   (SELECT COUNT(*) FROM quiz_questions qq WHERE qq.quiz_id = q.id) as q_count,
+                   (SELECT COALESCE(SUM(ques.marks), 0) FROM questions ques JOIN quiz_questions qq ON ques.id = qq.question_id WHERE qq.quiz_id = q.id) as calc_marks
+            FROM quizzes q
+            LEFT JOIN subjects s ON q.subject_id = s.id
+            """
+        else:
+            sql = """
+            SELECT q.*, s.name as sub_name,
+                   (SELECT COUNT(*) FROM questions ques WHERE ques.quiz_id = q.id) as q_count,
+                   (SELECT COALESCE(SUM(ques.marks), 0) FROM questions ques WHERE ques.quiz_id = q.id) as calc_marks
+            FROM quizzes q
+            LEFT JOIN subjects s ON q.subject_id = s.id
+            """
         params = []
         if subject_id:
             sql += " WHERE q.subject_id = ?"
@@ -154,12 +172,18 @@ class QuizRepository:
                         q_norm['subject'] = sub_row['name']
 
                 try:
-                    q_res = supabase.table('questions').select('id', count='exact', head=True).eq('quiz_id', clean_id).execute()
+                    q_res = supabase.table('quiz_questions').select('id', count='exact', head=True).eq('quiz_id', clean_id).execute()
                     if q_res is not None and getattr(q_res, 'count', None) is not None:
                         q_norm['question_count'] = q_res.count
                         q_norm['total_questions'] = q_res.count
                 except Exception as count_err:
-                    logger.debug("Count lookup on questions table failed: %s", count_err)
+                    try:
+                        q_res = supabase.table('questions').select('id', count='exact', head=True).eq('quiz_id', clean_id).execute()
+                        if q_res is not None and getattr(q_res, 'count', None) is not None:
+                            q_norm['question_count'] = q_res.count
+                            q_norm['total_questions'] = q_res.count
+                    except Exception:
+                        logger.debug("Count lookup on quiz_questions failed: %s", count_err)
                 return q_norm
             except Exception as e:
                 logger.error("Supabase get quiz by id error: %s", e)
@@ -167,14 +191,29 @@ class QuizRepository:
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-        SELECT q.*, s.name as sub_name,
-               (SELECT COUNT(*) FROM questions ques WHERE ques.quiz_id = q.id) as q_count,
-               (SELECT COALESCE(SUM(ques.marks), 0) FROM questions ques WHERE ques.quiz_id = q.id) as calc_marks
-        FROM quizzes q
-        LEFT JOIN subjects s ON q.subject_id = s.id
-        WHERE q.id = ?
-        """, (clean_id,))
+        
+        cursor.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='quiz_questions'")
+        has_qq = cursor.fetchone()[0] > 0
+        
+        if has_qq:
+            sql = """
+            SELECT q.*, s.name as sub_name,
+                   (SELECT COUNT(*) FROM quiz_questions qq WHERE qq.quiz_id = q.id) as q_count,
+                   (SELECT COALESCE(SUM(ques.marks), 0) FROM questions ques JOIN quiz_questions qq ON ques.id = qq.question_id WHERE qq.quiz_id = q.id) as calc_marks
+            FROM quizzes q
+            LEFT JOIN subjects s ON q.subject_id = s.id
+            WHERE q.id = ?
+            """
+        else:
+            sql = """
+            SELECT q.*, s.name as sub_name,
+                   (SELECT COUNT(*) FROM questions ques WHERE ques.quiz_id = q.id) as q_count,
+                   (SELECT COALESCE(SUM(ques.marks), 0) FROM questions ques WHERE ques.quiz_id = q.id) as calc_marks
+            FROM quizzes q
+            LEFT JOIN subjects s ON q.subject_id = s.id
+            WHERE q.id = ?
+            """
+        cursor.execute(sql, (clean_id,))
         row = cursor.fetchone()
         conn.close()
         if not row:
@@ -676,6 +715,10 @@ class QuizRepository:
         supabase = get_supabase_client()
         if supabase:
             try:
+                try:
+                    supabase.table('quiz_questions').delete().eq('quiz_id', clean_id).execute()
+                except Exception:
+                    pass
                 supabase.table('quizzes').delete().eq('id', clean_id).execute()
                 return True
             except Exception as e:
@@ -684,8 +727,14 @@ class QuizRepository:
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        # Delete related questions first if SQLite foreign keys aren't cascading
-        cursor.execute("DELETE FROM questions WHERE quiz_id = ?", (clean_id,))
+        try:
+            cursor.execute("DELETE FROM quiz_questions WHERE quiz_id = ?", (clean_id,))
+        except Exception:
+            pass
+        cursor.execute("PRAGMA table_info(questions)")
+        q_cols = [c['name'] for c in cursor.fetchall()]
+        if 'quiz_id' in q_cols:
+            cursor.execute("DELETE FROM questions WHERE quiz_id = ?", (clean_id,))
         cursor.execute("DELETE FROM quizzes WHERE id = ?", (clean_id,))
         conn.commit()
         conn.close()
@@ -696,19 +745,36 @@ class QuizRepository:
         clean_id = str(quiz_id).strip()
         supabase = get_supabase_client()
         if supabase:
+            total_q = 0
+            total_m = 0.0
             try:
-                q_res = supabase.table('questions').select('marks').eq('quiz_id', clean_id).execute()
-                rows = q_res.data or []
-                total_q = len(rows)
-                total_m = sum(float(r.get('marks') or 1.0) for r in rows)
+                # 1. Fetch questions associated via authoritative quiz_questions join table
+                try:
+                    qq_res = supabase.table('quiz_questions').select('question_id').eq('quiz_id', clean_id).execute()
+                    qq_rows = qq_res.data or []
+                    total_q = len(qq_rows)
+                    q_ids = [r['question_id'] for r in qq_rows if r.get('question_id')]
+                    if q_ids:
+                        marks_res = supabase.table('questions').select('marks').in_('id', q_ids).execute()
+                        marks_rows = marks_res.data or []
+                        total_m = sum(float(r.get('marks') or 1.0) for r in marks_rows)
+                except Exception as qq_err:
+                    # Fallback to direct questions.quiz_id if join table fails
+                    logger.debug("Recalculate via quiz_questions failed, trying questions: %s", qq_err)
+                    q_res = supabase.table('questions').select('marks').eq('quiz_id', clean_id).execute()
+                    rows = q_res.data or []
+                    total_q = len(rows)
+                    total_m = sum(float(r.get('marks') or 1.0) for r in rows)
+
                 now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                rounded_m = int(round(total_m)) if float(total_m).is_integer() else total_m
                 
                 if total_q == 0:
                     for pub_val in (0, False):
                         try:
                             supabase.table('quizzes').update({
                                 'total_questions': total_q,
-                                'total_marks': int(round(total_m)) if float(total_m).is_integer() else total_m,
+                                'total_marks': rounded_m,
                                 'published': pub_val,
                                 'status': 'draft',
                                 'updated_at': now
@@ -719,26 +785,47 @@ class QuizRepository:
                 else:
                     supabase.table('quizzes').update({
                         'total_questions': total_q,
-                        'total_marks': int(round(total_m)) if float(total_m).is_integer() else total_m,
+                        'total_marks': rounded_m,
                         'updated_at': now
                     }).eq('id', clean_id).execute()
                 return total_q, total_m
             except Exception as e:
                 logger.error("Supabase recalculate_totals error: %s", e)
                 return total_q, total_m
-            except Exception as e:
-                logger.error("Supabase recalculate_totals error: %s", e)
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-        SELECT COUNT(id) as count, COALESCE(SUM(marks), 0) as total_marks
-        FROM questions
-        WHERE quiz_id = ?
-        """, (clean_id,))
-        row = cursor.fetchone()
-        count = row['count'] if row else 0
-        total_marks = row['total_marks'] if row else 0
+        
+        # Check if quiz_questions join table has records
+        cursor.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='quiz_questions'")
+        has_qq = cursor.fetchone()[0] > 0
+        
+        count = 0
+        total_marks = 0.0
+        if has_qq:
+            cursor.execute("""
+            SELECT COUNT(q.id) as count, COALESCE(SUM(q.marks), 0) as total_marks
+            FROM questions q
+            JOIN quiz_questions qq ON q.id = qq.question_id
+            WHERE qq.quiz_id = ?
+            """, (clean_id,))
+            row = cursor.fetchone()
+            count = row['count'] if row else 0
+            total_marks = row['total_marks'] if row else 0.0
+
+        if count == 0:
+            cursor.execute("PRAGMA table_info(questions)")
+            q_cols = [c['name'] for c in cursor.fetchall()]
+            if 'quiz_id' in q_cols:
+                cursor.execute("""
+                SELECT COUNT(id) as count, COALESCE(SUM(marks), 0) as total_marks
+                FROM questions
+                WHERE quiz_id = ?
+                """, (clean_id,))
+                row = cursor.fetchone()
+                if row and row['count']:
+                    count = row['count']
+                    total_marks = row['total_marks']
 
         unpub = ", published = 0, status = 'draft'" if count == 0 else ""
         cursor.execute(f"""
