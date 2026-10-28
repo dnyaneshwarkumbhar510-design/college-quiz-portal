@@ -3,119 +3,135 @@
 {% block title %}Student Profile - {{ student.full_name }}{% endblock %}
 
 {% block admin_content %}
-<div class="space-y-6">
-  <!-- Back button -->
-  <a href="{{ url_for('faculty.faculty_students') }}"
-     class="inline-flex items-center text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
-    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-    </svg>
-    Back to All Students
-  </a>
+<div class="admin-student-profile-container">
+  <!-- Back Link & Page Header -->
+  <div>
+    <a href="{{ url_for('faculty.faculty_students') }}" class="admin-student-profile-back-link">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      ← Back to Student Registry
+      <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">(Back to All Students)</span>
+    </a>
+  </div>
 
-  <!-- Student Profile Card (Section 21) -->
-  <div class="bg-[#0f2744] text-white rounded-2xl p-4 sm:p-6 shadow-sm">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div class="flex items-center space-x-3 sm:space-x-4 min-w-0">
-        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shrink-0 font-black text-xl">
-          {{ student.full_name[:1]|upper }}
+  <div class="admin-page-header" style="margin-bottom: 0;">
+    <div class="admin-page-title-group">
+      <span class="section-tag">Candidate Profile</span>
+      <h1>Student Profile</h1>
+      <p>Comprehensive candidate particulars, performance metrics, and verified examination submissions.</p>
+    </div>
+  </div>
+
+  <!-- Student Identity Card -->
+  <div class="admin-student-profile-identity-card">
+    <div class="admin-student-profile-avatar-wrap">
+      <div class="admin-student-profile-avatar">
+        {{ student.full_name[:1]|upper }}
+      </div>
+      <div class="admin-student-profile-info">
+        <div class="admin-student-profile-name-row">
+          <h2 class="admin-student-profile-name">{{ student.full_name }}</h2>
+          <span class="badge badge-success">● Active Candidate</span>
         </div>
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white truncate">{{ student.full_name }}</h1>
-            <span class="badge badge-success text-[10px]">ACTIVE CANDIDATE</span>
-          </div>
-          <div class="mt-1 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 text-xs text-blue-200">
-            <span>Roll: <strong class="text-white">{{ student.roll_number }}</strong></span>
-            <span>•</span>
-            <span>Division: <strong class="text-white">{{ student.division }}</strong></span>
-            <span>•</span>
-            <span>Class: <strong class="text-white">{{ student.class_name }}</strong></span>
-            <span>•</span>
-            <span>Dept: <strong class="text-white">{{ student.department }}</strong></span>
-          </div>
+        <div class="admin-student-profile-meta-pills">
+          <span>Roll: <strong>{{ student.roll_number }}</strong></span>
+          <span class="admin-student-profile-meta-divider">•</span>
+          <span>Division: <strong>{{ student.division }}</strong></span>
+          <span class="admin-student-profile-meta-divider">•</span>
+          <span>Class: <strong>{{ student.class_name }}</strong></span>
+          <span class="admin-student-profile-meta-divider">•</span>
+          <span>Dept: <strong>{{ student.department }}</strong></span>
+          {% if student.student_id_number %}
+          <span class="admin-student-profile-meta-divider">•</span>
+          <span>PRN: <strong>{{ student.student_id_number }}</strong></span>
+          {% endif %}
         </div>
       </div>
+    </div>
 
-      <div class="text-xs text-blue-200">
-        <span>Institutional Email: </span>
-        <strong class="text-white font-mono block sm:inline break-all">{{ student.email or 'N/A' }}</strong>
-      </div>
+    <div class="admin-student-profile-email-box">
+      <span>Institutional Email</span>
+      <strong>{{ student.email or 'N/A' }}</strong>
     </div>
   </div>
 
   <!-- Performance Summary Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="text-slate-500 block text-xs font-bold uppercase">Total Submissions</span>
-      <span class="text-2xl font-black text-slate-900 mt-1 block">{{ total_attempts }}</span>
-      <span class="text-[11px] text-slate-400">Completed examinations</span>
+  <div class="stat-cards-grid">
+    <div class="stat-card">
+      <span class="stat-card-title">Total Submissions</span>
+      <div class="stat-card-value">{{ total_attempts }}</div>
+      <span class="stat-card-desc">Completed examinations</span>
     </div>
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="text-slate-500 block text-xs font-bold uppercase">Average Score</span>
-      <span class="text-2xl font-black text-blue-700 mt-1 block">{{ avg_score }} Marks</span>
-      <span class="text-[11px] text-slate-400">Out of full quiz marks</span>
+    <div class="stat-card">
+      <span class="stat-card-title">Average Marks</span>
+      <div class="stat-card-value" style="color: #2563eb;">{{ avg_score }} Marks</div>
+      <span class="stat-card-desc">Mean performance score</span>
     </div>
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="text-slate-500 block text-xs font-bold uppercase">Passed Quizzes</span>
-      <span class="text-2xl font-black text-emerald-600 mt-1 block">{{ pass_count }}</span>
-      <span class="text-[11px] text-slate-400">Criteria ≥ 40%</span>
+    <div class="stat-card">
+      <span class="stat-card-title">Highest Score</span>
+      <div class="stat-card-value" style="color: #16a34a;">
+        {% if attempts %}{{ attempts|map(attribute='obtained_marks')|max }}{% else %}0.0{% endif %} Marks
+      </div>
+      <span class="stat-card-desc">Top examination mark achieved</span>
     </div>
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="text-slate-500 block text-xs font-bold uppercase">Failed Quizzes</span>
-      <span class="text-2xl font-black text-red-600 mt-1 block">{{ fail_count }}</span>
-      <span class="text-[11px] text-slate-400">Score &lt; 40%</span>
+    <div class="stat-card">
+      <span class="stat-card-title">Evaluation Status</span>
+      <div class="stat-card-value" style="font-size: 20px;">
+        <span style="color: #16a34a;">{{ pass_count }} Passed</span> / <span style="color: #dc2626;">{{ fail_count }} Failed</span>
+      </div>
+      <span class="stat-card-desc">Criterion: ≥ 40% passing standard</span>
     </div>
   </div>
 
-  <!-- Examination History Table -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5 flex justify-between items-center">
+  <!-- Examination / Attempt History -->
+  <div class="admin-student-profile-history-card">
+    <div class="admin-student-profile-history-header">
       <div>
-        <h3 class="text-sm font-bold text-slate-900">Completed Examination Records</h3>
-        <p class="text-xs text-slate-500">All submitted evaluations for this candidate</p>
+        <h3 style="font-size: 15px; font-weight: 700; color: #0f172a;">Completed Examination Records</h3>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Verified assessment attempts and automated evaluation results</p>
       </div>
-      <span class="text-xs font-bold text-slate-600">{{ attempts|length }} Attempts</span>
+      <span class="badge badge-navy">{{ attempts|length }} Attempts</span>
     </div>
 
     {% if attempts %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs border-collapse">
+    <div class="admin-student-profile-table-wrap">
+      <table class="admin-student-profile-table">
         <thead>
-          <tr class="bg-slate-50/60 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-            <th class="py-3 px-4">Quiz Title</th>
-            <th class="py-3 px-4">Unit</th>
-            <th class="py-3 px-4">Submitted At</th>
-            <th class="py-3 px-4 text-center">Marks Obtained</th>
-            <th class="py-3 px-4 text-center">Percentage</th>
-            <th class="py-3 px-4 text-center">Status</th>
-            <th class="py-3 px-4 text-right">Actions</th>
+          <tr>
+            <th>Quiz Title</th>
+            <th>Unit</th>
+            <th>Submission Timestamp</th>
+            <th style="text-align: center;">Marks Obtained</th>
+            <th style="text-align: center;">Percentage</th>
+            <th style="text-align: center;">Status</th>
+            <th style="text-align: right;">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
+        <tbody>
           {% for a in attempts %}
-          <tr class="hover:bg-slate-50 transition-colors">
-            <td class="py-3 px-4 font-bold text-slate-900">{{ a.quiz_title or 'Curriculum Quiz' }}</td>
-            <td class="py-3 px-4 text-slate-600 font-semibold">Unit {{ a.unit_number|default(1) }}</td>
-            <td class="py-3 px-4 text-slate-500 font-mono text-[11px]">
+          <tr>
+            <td style="font-weight: 700; color: #0f172a;">{{ a.quiz_title or 'Curriculum Quiz' }}</td>
+            <td style="color: #475569; font-weight: 600;">Unit {{ a.unit_number|default(1) }}</td>
+            <td style="color: #64748b; font-family: monospace; font-size: 11px;">
               {{ a.submitted_at[:16]|replace('T', ' ') if a.submitted_at else 'Submitted' }}
             </td>
-            <td class="py-3 px-4 text-center font-bold text-slate-900">
+            <td style="text-align: center; font-weight: 700; color: #0f172a;">
               {{ a.obtained_marks }} / {{ a.total_marks }}
             </td>
-            <td class="py-3 px-4 text-center font-bold text-blue-700">
+            <td style="text-align: center; font-weight: 700; color: #2563eb;">
               {{ a.percentage }}%
             </td>
-            <td class="py-3 px-4 text-center">
+            <td style="text-align: center;">
               {% if a.status == 'PASS' %}
-              <span class="badge badge-success text-[10px]">PASS</span>
+              <span class="badge badge-success" style="font-size: 10px;">PASS</span>
               {% else %}
-              <span class="badge badge-danger text-[10px]">FAIL</span>
+              <span class="badge badge-danger" style="font-size: 10px;">FAIL</span>
               {% endif %}
             </td>
-            <td class="py-3 px-4 text-right">
+            <td style="text-align: right;">
               <a href="{{ url_for('student.student_result_page', attempt_id=a.id) }}"
-                 class="btn btn-outline btn-sm text-xs font-semibold"
+                 class="btn btn-outline btn-sm"
                  target="_blank">
                 View Result
               </a>
@@ -126,8 +142,12 @@
       </table>
     </div>
     {% else %}
-    <div class="p-8 text-center text-slate-400 text-xs">
-      This student has not submitted any quizzes yet.
+    <div class="admin-empty-card" style="border: none; box-shadow: none; padding: 48px 24px;">
+      <div class="admin-empty-icon">📝</div>
+      <h3 class="admin-empty-title">No examination attempts recorded yet.</h3>
+      <p class="admin-empty-desc">
+        When this candidate completes online examinations, their detailed scorecard, marks, and evaluation records will appear here.
+      </p>
     </div>
     {% endif %}
   </div>

@@ -1505,5 +1505,87 @@ class TestFixesVerification(unittest.TestCase):
             self.assertEqual(res_st.status_code, 200)
             self.assertIn('Student Dashboard', res_st.get_data(as_text=True))
 
+    def test_student_login_page_dropdown_options(self):
+        """Verify Student Login page has exact requested dropdown options for Class, Dept, Div."""
+        res = self.client.get('/login/student')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Check Academic Year dropdown options
+        for yr in ['First Year', 'Second Year', 'Third Year', 'Fourth Year']:
+            self.assertIn(f'<option value="{yr}">{yr}</option>', html)
+
+        # Check Department dropdown options
+        for dept in ['CSE', 'AIDS', 'CE', 'IT', 'AI', 'Mechanical', 'ENTC', 'ECE', 'Other']:
+            self.assertIn(f'<option value="{dept}">{dept}</option>', html)
+
+        # Check Division options A through Q
+        for div_char in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q']:
+            self.assertIn(f'<option value="{div_char}">{div_char}</option>', html)
+
+    def test_student_profile_layout_and_elements(self):
+        """Verify candidate profile page rendered elements, scoped CSS classes, and KPI cards."""
+        with self.client.session_transaction() as sess:
+            sess['faculty'] = {'username': 'admin', 'name': 'Prof. Test'}
+
+        # Ensure student exists
+        student = StudentRepository.create_or_login({
+            'full_name': 'Institutional Test Candidate',
+            'roll_number': 'TST_999',
+            'class_name': 'Third Year',
+            'division': 'B',
+            'department': 'CSE',
+            'email': 'tst_candidate@college.edu',
+            'student_id_number': 'PRN_TST_999'
+        })
+        student_id = student['id']
+
+        res = self.client.get(f'/admin/students/{student_id}')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Scoped classes and structural elements
+        self.assertIn('admin-student-profile-container', html)
+        self.assertIn('admin-student-profile-back-link', html)
+        self.assertIn('admin-student-profile-identity-card', html)
+        self.assertIn('admin-student-profile-avatar', html)
+        self.assertIn('admin-student-profile-email-box', html)
+        self.assertIn('admin-student-profile-history-card', html)
+
+        # Candidate particulars
+        self.assertIn('Institutional Test Candidate', html)
+        self.assertIn('TST_999', html)
+        self.assertIn('Third Year', html)
+        self.assertIn('CSE', html)
+        self.assertIn('tst_candidate@college.edu', html)
+        self.assertIn('PRN_TST_999', html)
+
+        # Performance summary metrics
+        self.assertIn('Total Submissions', html)
+        self.assertIn('Average Marks', html)
+        self.assertIn('Highest Score', html)
+        self.assertIn('Evaluation Status', html)
+
+    def test_existing_student_database_record_compatibility(self):
+        """Verify legacy student records with non-dropdown values like 'SE Computer' display cleanly."""
+        with self.client.session_transaction() as sess:
+            sess['faculty'] = {'username': 'admin', 'name': 'Prof. Test'}
+
+        legacy_student = StudentRepository.create_or_login({
+            'full_name': 'Dnyaneshwar Kumbhar Legacy',
+            'roll_number': 'LEGACY_042',
+            'class_name': 'SE Computer',
+            'division': 'A',
+            'department': 'Computer Engineering'
+        })
+
+        res = self.client.get(f"/admin/students/{legacy_student['id']}")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        self.assertIn('Dnyaneshwar Kumbhar Legacy', html)
+        self.assertIn('SE Computer', html)
+        self.assertIn('Computer Engineering', html)
+
 if __name__ == '__main__':
     unittest.main()
