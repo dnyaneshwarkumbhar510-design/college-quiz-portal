@@ -186,10 +186,10 @@ class AttemptRepository:
             is_correct = False
             marks_awarded = 0.0
 
-            if user_choice:
-                user_choice = str(user_choice).strip().upper()
+            clean_choice = str(user_choice).strip().upper() if user_choice is not None else None
+            if clean_choice in ('A', 'B', 'C', 'D'):
                 attempted_count += 1
-                if user_choice == str(q['correct_answer']).strip().upper():
+                if clean_choice == str(q.get('correct_answer', '')).strip().upper():
                     is_correct = True
                     q_marks = float(q.get('marks', 1.0) or 1.0)
                     marks_awarded = q_marks
@@ -197,6 +197,7 @@ class AttemptRepository:
                     obtained_marks += q_marks
                 else:
                     wrong_count += 1
+                user_choice = clean_choice
             else:
                 user_choice = None
 
@@ -218,11 +219,32 @@ class AttemptRepository:
 
         if supabase:
             try:
-                # Delete any existing partial answers
+                # 1. Format answers for Supabase PostgreSQL (production column answers.is_correct is INTEGER 1/0)
+                supabase_answers = []
+                for ans in answers_to_insert:
+                    ans_payload = dict(ans)
+                    ans_payload['is_correct'] = 1 if ans['is_correct'] else 0
+                    supabase_answers.append(ans_payload)
+
+                # 2. Delete any existing partial answers for this attempt
                 supabase.table('answers').delete().eq('attempt_id', clean_att_id).execute()
-                # Insert evaluated answers
-                supabase.table('answers').insert(answers_to_insert).execute()
-                # Update attempt record
+
+                # 3. Insert evaluated answers (with adaptive fallback if a database requires BOOLEAN)
+                try:
+                    supabase.table('answers').insert(supabase_answers).execute()
+                except Exception as ins_err:
+                    err_str = str(ins_err).lower()
+                    if 'boolean' in err_str or '42804' in err_str:
+                        boolean_answers = []
+                        for ans in answers_to_insert:
+                            ans_b = dict(ans)
+                            ans_b['is_correct'] = bool(ans['is_correct'])
+                            boolean_answers.append(ans_b)
+                        supabase.table('answers').insert(boolean_answers).execute()
+                    else:
+                        raise ins_err
+
+                # 4. Update attempt record
                 supabase.table('attempts').update({
                     'submitted_at': now_iso,
                     'total_questions': len(questions),
@@ -311,15 +333,15 @@ class AttemptRepository:
             awarded = float(matched_ans.get('marks_awarded', 0.0)) if matched_ans else 0.0
 
             reviews.append({
-                'question_id': q['id'],
-                'question_text': q['question_text'],
-                'option_a': q['option_a'],
-                'option_b': q['option_b'],
-                'option_c': q['option_c'],
-                'option_d': q['option_d'],
+                'question_id': q.get('id'),
+                'question_text': q.get('question_text', ''),
+                'option_a': q.get('option_a', ''),
+                'option_b': q.get('option_b', ''),
+                'option_c': q.get('option_c', ''),
+                'option_d': q.get('option_d', ''),
                 'selected_answer': user_choice,
                 'selected_option': user_choice,
-                'correct_answer': q['correct_answer'],
+                'correct_answer': q.get('correct_answer', ''),
                 'is_correct': is_corr,
                 'marks_awarded': awarded,
                 'max_marks': float(q.get('marks', 1.0) or 1.0),

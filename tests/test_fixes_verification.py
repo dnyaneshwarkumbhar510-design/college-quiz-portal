@@ -1,5 +1,7 @@
 import unittest
 import json
+import datetime
+import uuid
 from unittest.mock import MagicMock, patch
 from main import app
 from config import Config
@@ -1041,6 +1043,301 @@ class TestFixesVerification(unittest.TestCase):
             self.assertEqual(quiz['question_count'], 4)
             self.assertEqual(quiz['total_questions'], 4)
             mock_qq_table.select.assert_called_with('id', count='exact', head=True)
+
+    def test_submit_attempt_converts_is_correct_to_integer_for_supabase(self):
+        """
+        Regression test: Verify AttemptRepository.submit_attempt converts is_correct
+        to integer 1/0 for Supabase PostgreSQL payload to prevent 22P02 syntax errors.
+        """
+        from app.database.repositories.attempt_repository import AttemptRepository
+
+        mock_supabase = MagicMock()
+        mock_attempts_table = MagicMock()
+        mock_answers_table = MagicMock()
+
+        attempt_row = {
+            'id': 'att-uuid-101',
+            'quiz_id': 'quiz-uuid-101',
+            'student_id': 'stu-uuid-101',
+            'status': 'in_progress',
+            'total_questions': 2,
+            'total_marks': 3.0
+        }
+
+        # Mock attempts select
+        mock_attempts_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=attempt_row)
+        # Mock attempts update
+        mock_attempts_table.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[attempt_row])
+        # Mock answers delete
+        mock_answers_table.delete.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+        # Mock answers insert
+        mock_answers_table.insert.return_value.execute.return_value = MagicMock(data=[])
+        # Mock answers select for get_attempt_details
+        mock_answers_table.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[
+            {'question_id': 'q-101', 'selected_answer': 'A', 'is_correct': 1, 'marks_awarded': 1.0},
+            {'question_id': 'q-102', 'selected_answer': 'C', 'is_correct': 0, 'marks_awarded': 0.0}
+        ])
+
+        def table_router(table_name):
+            if table_name == 'attempts':
+                return mock_attempts_table
+            elif table_name == 'answers':
+                return mock_answers_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        fake_quiz = {
+            'id': 'quiz-uuid-101',
+            'title': 'Test Quiz',
+            'pass_percentage': 40.0,
+            'total_marks': 3.0
+        }
+
+        fake_questions = [
+            {'id': 'q-101', 'question_text': 'Q1', 'option_a': 'Opt A', 'option_b': 'Opt B', 'option_c': 'Opt C', 'option_d': 'Opt D', 'correct_answer': 'A', 'marks': 1.0},
+            {'id': 'q-102', 'question_text': 'Q2', 'option_a': 'Opt A', 'option_b': 'Opt B', 'option_c': 'Opt C', 'option_d': 'Opt D', 'correct_answer': 'B', 'marks': 2.0}
+        ]
+
+        with patch('app.database.repositories.attempt_repository.get_supabase_client', return_value=mock_supabase):
+            with patch('app.database.repositories.attempt_repository.QuizRepository.get_by_id', return_value=fake_quiz):
+                with patch('app.database.repositories.attempt_repository.QuestionRepository.get_by_quiz', return_value=fake_questions):
+                    with patch('app.database.repositories.attempt_repository.StudentRepository.get_by_id', return_value={'id': 'stu-uuid-101', 'full_name': 'Test Student'}):
+                        result = AttemptRepository.submit_attempt('att-uuid-101', {
+                            'q-101': 'A', # Correct
+                            'q-102': 'C'  # Wrong
+                        })
+
+                        # Verify answers delete was called for this attempt
+                        mock_answers_table.delete.assert_called()
+                        mock_answers_table.delete.return_value.eq.assert_called_with('attempt_id', 'att-uuid-101')
+
+                        # Verify answers insert was called
+                        mock_answers_table.insert.assert_called_once()
+                        inserted_answers = mock_answers_table.insert.call_args[0][0]
+
+                        self.assertEqual(len(inserted_answers), 2)
+
+                        # Q1 answer assertions:
+                        q1_ans = next(a for a in inserted_answers if a['question_id'] == 'q-101')
+                        self.assertEqual(q1_ans['selected_answer'], 'A')
+                        self.assertIsInstance(q1_ans['is_correct'], int)
+                        self.assertNotIsInstance(q1_ans['is_correct'], bool)
+                        self.assertEqual(q1_ans['is_correct'], 1, "is_correct must be integer 1 for Supabase")
+                        self.assertEqual(q1_ans['marks_awarded'], 1.0)
+
+                        # Q2 answer assertions:
+                        q2_ans = next(a for a in inserted_answers if a['question_id'] == 'q-102')
+                        self.assertEqual(q2_ans['selected_answer'], 'C')
+                        self.assertIsInstance(q2_ans['is_correct'], int)
+                        self.assertNotIsInstance(q2_ans['is_correct'], bool)
+                        self.assertEqual(q2_ans['is_correct'], 0, "is_correct must be integer 0 for Supabase")
+                        self.assertEqual(q2_ans['marks_awarded'], 0.0)
+
+                        # Verify attempts update payload
+                        mock_attempts_table.update.assert_called_once()
+                        att_update = mock_attempts_table.update.call_args[0][0]
+                        self.assertEqual(att_update['total_questions'], 2)
+                        self.assertEqual(att_update['attempted_questions'], 2)
+                        self.assertEqual(att_update['correct_answers'], 1)
+                        self.assertEqual(att_update['wrong_answers'], 1)
+                        self.assertEqual(att_update['unattempted'], 0)
+                        self.assertEqual(att_update['obtained_marks'], 1.0)
+                        self.assertEqual(att_update['percentage'], 33.33)
+                        self.assertEqual(att_update['status'], 'FAIL') # 33.33% < 40%
+
+                        # Verify reviews returned retain Python booleans for internal app usage
+                        self.assertIsNotNone(result)
+                        reviews = result['reviews']
+                        q1_rev = next(r for r in reviews if r['question_id'] == 'q-101')
+                        self.assertIs(q1_rev['is_correct'], True)
+                        q2_rev = next(r for r in reviews if r['question_id'] == 'q-102')
+                        self.assertIs(q2_rev['is_correct'], False)
+
+    def test_submit_attempt_handles_unanswered_questions(self):
+        """
+        Verify that unanswered questions have selected_answer=None, is_correct=0,
+        marks_awarded=0.0, and unattempted count is accurate.
+        """
+        from app.database.repositories.attempt_repository import AttemptRepository
+
+        mock_supabase = MagicMock()
+        mock_attempts_table = MagicMock()
+        mock_answers_table = MagicMock()
+
+        attempt_row = {
+            'id': 'att-uuid-102',
+            'quiz_id': 'quiz-uuid-102',
+            'student_id': 'stu-uuid-102',
+            'status': 'in_progress',
+            'total_questions': 2,
+            'total_marks': 2.0
+        }
+
+        mock_attempts_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=attempt_row)
+        mock_attempts_table.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[attempt_row])
+        mock_answers_table.delete.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+        mock_answers_table.insert.return_value.execute.return_value = MagicMock(data=[])
+        mock_answers_table.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+        def table_router(table_name):
+            if table_name == 'attempts': return mock_attempts_table
+            elif table_name == 'answers': return mock_answers_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        fake_quiz = {'id': 'quiz-uuid-102', 'title': 'Test Quiz 2', 'pass_percentage': 40.0, 'total_marks': 2.0}
+        fake_questions = [
+            {'id': 'q-201', 'question_text': 'Q201', 'option_a': 'Opt A', 'option_b': 'Opt B', 'option_c': 'Opt C', 'option_d': 'Opt D', 'correct_answer': 'B', 'marks': 1.0},
+            {'id': 'q-202', 'question_text': 'Q202', 'option_a': 'Opt A', 'option_b': 'Opt B', 'option_c': 'Opt C', 'option_d': 'Opt D', 'correct_answer': 'D', 'marks': 1.0}
+        ]
+
+        with patch('app.database.repositories.attempt_repository.get_supabase_client', return_value=mock_supabase):
+            with patch('app.database.repositories.attempt_repository.QuizRepository.get_by_id', return_value=fake_quiz):
+                with patch('app.database.repositories.attempt_repository.QuestionRepository.get_by_quiz', return_value=fake_questions):
+                    with patch('app.database.repositories.attempt_repository.StudentRepository.get_by_id', return_value={'id': 'stu-uuid-102'}):
+                        # Empty answers submitted
+                        AttemptRepository.submit_attempt('att-uuid-102', {})
+
+                        inserted_answers = mock_answers_table.insert.call_args[0][0]
+                        self.assertEqual(len(inserted_answers), 2)
+                        for ans in inserted_answers:
+                            self.assertIsNone(ans['selected_answer'])
+                            self.assertEqual(ans['is_correct'], 0)
+                            self.assertEqual(ans['marks_awarded'], 0.0)
+
+                        att_update = mock_attempts_table.update.call_args[0][0]
+                        self.assertEqual(att_update['attempted_questions'], 0)
+                        self.assertEqual(att_update['correct_answers'], 0)
+                        self.assertEqual(att_update['wrong_answers'], 0)
+                        self.assertEqual(att_update['unattempted'], 2)
+                        self.assertEqual(att_update['obtained_marks'], 0.0)
+                        self.assertEqual(att_update['percentage'], 0.0)
+                        self.assertEqual(att_update['status'], 'FAIL')
+
+    def test_submit_attempt_adaptive_fallback_to_boolean_if_schema_requires_it(self):
+        """
+        Verify that if Supabase throws a 42804 / boolean mismatch error,
+        it automatically retries with boolean values.
+        """
+        from app.database.repositories.attempt_repository import AttemptRepository
+
+        mock_supabase = MagicMock()
+        mock_attempts_table = MagicMock()
+        mock_answers_table = MagicMock()
+
+        attempt_row = {
+            'id': 'att-uuid-103',
+            'quiz_id': 'quiz-uuid-103',
+            'student_id': 'stu-uuid-103',
+            'status': 'in_progress'
+        }
+
+        mock_attempts_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=attempt_row)
+        mock_attempts_table.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[attempt_row])
+        mock_answers_table.delete.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+        # First insert fails with 42804 boolean type error, second insert succeeds
+        mock_answers_table.insert.side_effect = [
+            Exception({'message': 'column "is_correct" is of type boolean but expression is of type integer', 'code': '42804'}),
+            MagicMock(data=[])
+        ]
+        mock_answers_table.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+        def table_router(table_name):
+            if table_name == 'attempts': return mock_attempts_table
+            elif table_name == 'answers': return mock_answers_table
+            return MagicMock()
+
+        mock_supabase.table.side_effect = table_router
+
+        fake_quiz = {'id': 'quiz-uuid-103', 'title': 'Test Quiz 3', 'pass_percentage': 50.0}
+        fake_questions = [{'id': 'q-301', 'question_text': 'Q301', 'option_a': 'Opt A', 'option_b': 'Opt B', 'option_c': 'Opt C', 'option_d': 'Opt D', 'correct_answer': 'A', 'marks': 2.0}]
+
+        with patch('app.database.repositories.attempt_repository.get_supabase_client', return_value=mock_supabase):
+            with patch('app.database.repositories.attempt_repository.QuizRepository.get_by_id', return_value=fake_quiz):
+                with patch('app.database.repositories.attempt_repository.QuestionRepository.get_by_quiz', return_value=fake_questions):
+                    with patch('app.database.repositories.attempt_repository.StudentRepository.get_by_id', return_value={'id': 'stu-uuid-103'}):
+                        AttemptRepository.submit_attempt('att-uuid-103', {'q-301': 'A'})
+
+                        # Verify insert was called twice (first integer, then boolean fallback)
+                        self.assertEqual(mock_answers_table.insert.call_count, 2)
+                        fallback_payload = mock_answers_table.insert.call_args_list[1][0][0]
+                        self.assertIs(fallback_payload[0]['is_correct'], True)
+
+    def test_api_student_submit_quiz_endpoint(self):
+        """
+        Integration test: Verify POST /api/student/submit-quiz processes answers,
+        updates scorecard, and returns HTTP 200 with result payload.
+        """
+        from app.database.repositories.student_repository import StudentRepository
+        from app.services.quiz_service import QuizService
+        from app.services.question_service import QuestionService
+        from app.database.repositories.attempt_repository import AttemptRepository
+
+        # Register a test student
+        roll = f"SUBMIT_{int(datetime.datetime.now().timestamp()) % 100000}"
+        student = StudentRepository.create_or_login({
+            'full_name': 'Submission Test Student',
+            'roll_number': roll,
+            'class_name': 'TE Computer',
+            'division': 'A',
+            'department': 'Computer Engineering',
+            'email': f'{roll.lower()}@college.edu'
+        })
+        self.assertIsNotNone(student)
+
+        # Create test quiz
+        subjects = SubjectRepository.get_all()
+        sub_id = subjects[0]['id']
+        quiz = QuizService.create_quiz({
+            'title': f'Submit Endpoint Quiz {roll}',
+            'subject_id': sub_id,
+            'unit_number': 1,
+            'duration_minutes': 15,
+            'total_marks': 2.0,
+            'passing_percentage': 40.0
+        })
+
+        # Add a question first
+        question = QuestionService.create_question({
+            'quiz_id': quiz['id'],
+            'question_text': 'What does SQL stand for?',
+            'option_a': 'Structured Query Language',
+            'option_b': 'Simple Query Language',
+            'option_c': 'Standard Query List',
+            'option_d': 'Sequential Query Logic',
+            'correct_answer': 'A',
+            'marks': 2.0
+        })
+
+        # Now publish the quiz
+        QuizRepository.toggle_publish(quiz['id'], True)
+
+        # Start attempt
+        attempt, is_completed = AttemptRepository.start_or_resume_attempt(quiz['id'], student['id'])
+        self.assertFalse(is_completed)
+
+        # Submit via client session
+        with self.client.session_transaction() as sess:
+            sess['student'] = student
+            sess['student_id'] = student['id']
+
+        response = self.client.post('/api/student/submit-quiz', json={
+            'attemptId': attempt['id'],
+            'answers': {
+                question['id']: 'A'
+            }
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['attemptId'], attempt['id'])
+        self.assertEqual(data['result']['obtained_marks'], 2.0)
+        self.assertEqual(data['result']['percentage'], 100.0)
+        self.assertEqual(data['result']['status'], 'PASS')
 
 if __name__ == '__main__':
     unittest.main()
