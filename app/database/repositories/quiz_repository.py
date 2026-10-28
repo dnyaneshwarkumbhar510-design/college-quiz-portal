@@ -32,6 +32,8 @@ class QuizRepository:
         is_pub = bool(d.get('is_published') or d.get('published'))
         d['is_published'] = is_pub
         d['published'] = is_pub
+        d['randomize_questions'] = bool(d.get('randomize_questions'))
+        d['randomize_options'] = bool(d.get('randomize_options'))
 
         sub = d.get('subjects')
         if isinstance(sub, dict):
@@ -186,6 +188,115 @@ class QuizRepository:
         return QuizRepository._normalize_quiz(d)
 
     @staticmethod
+    def _insert_supabase_quiz(supabase, base_payload, is_pub, rand_q, rand_opt):
+        """
+        Attempts to insert into Supabase quizzes table, adapting boolean/integer
+        flag columns (published, randomize_questions, randomize_options) to match
+        the PostgreSQL column definitions (whether INTEGER or BOOLEAN).
+        """
+        flag_variations = [
+            # Var 1: Integer flags (0/1) - primary for production schema where False caused 22P02
+            {
+                'published': 1 if is_pub else 0,
+                'randomize_questions': 1 if rand_q else 0,
+                'randomize_options': 1 if rand_opt else 0
+            },
+            # Var 2: Published boolean, randomize integer
+            {
+                'published': is_pub,
+                'randomize_questions': 1 if rand_q else 0,
+                'randomize_options': 1 if rand_opt else 0
+            },
+            # Var 3: Published integer, randomize boolean
+            {
+                'published': 1 if is_pub else 0,
+                'randomize_questions': rand_q,
+                'randomize_options': rand_opt
+            },
+            # Var 4: All boolean flags
+            {
+                'published': is_pub,
+                'randomize_questions': rand_q,
+                'randomize_options': rand_opt
+            }
+        ]
+
+        last_error = None
+        for flags in flag_variations:
+            payload = dict(base_payload)
+            payload.update(flags)
+            try:
+                res = supabase.table('quizzes').insert(payload).execute()
+                if not res or not getattr(res, 'data', None) or len(res.data) == 0:
+                    raise RuntimeError("Supabase returned empty response upon quiz creation")
+                return res.data[0]
+            except Exception as e:
+                err_str = str(e).lower()
+                last_error = e
+                # Check for 22P02 (invalid input syntax for type integer: "false") or 42804 (boolean/integer mismatch)
+                if any(k in err_str for k in ('invalid input syntax for type integer', 'type boolean', '22p02', '42804')):
+                    logger.warning("Quiz insertion flag type attempt failed (%s), trying alternate flag types...", e)
+                    continue
+                # For non-type errors (e.g. constraints or network), re-raise immediately
+                raise
+
+        logger.error("Supabase create_quiz error after all flag type variations: %s", last_error)
+        raise RuntimeError(f"Database error creating quiz: {last_error}")
+
+    @staticmethod
+    def _update_supabase_quiz(supabase, clean_id, base_update, has_pub=False, pub_val=False, has_rand_q=False, rand_q_val=False, has_rand_opt=False, rand_opt_val=False):
+        """
+        Attempts to update Supabase quizzes table, adapting boolean/integer
+        flag columns to match the PostgreSQL column definitions (whether INTEGER or BOOLEAN).
+        """
+        flag_variations = [
+            # Var 1: Integer flags
+            {
+                **({'published': 1 if pub_val else 0} if has_pub else {}),
+                **({'randomize_questions': 1 if rand_q_val else 0} if has_rand_q else {}),
+                **({'randomize_options': 1 if rand_opt_val else 0} if has_rand_opt else {})
+            },
+            # Var 2: Published boolean, randomize integer
+            {
+                **({'published': pub_val} if has_pub else {}),
+                **({'randomize_questions': 1 if rand_q_val else 0} if has_rand_q else {}),
+                **({'randomize_options': 1 if rand_opt_val else 0} if has_rand_opt else {})
+            },
+            # Var 3: Published integer, randomize boolean
+            {
+                **({'published': 1 if pub_val else 0} if has_pub else {}),
+                **({'randomize_questions': rand_q_val} if has_rand_q else {}),
+                **({'randomize_options': rand_opt_val} if has_rand_opt else {})
+            },
+            # Var 4: All boolean
+            {
+                **({'published': pub_val} if has_pub else {}),
+                **({'randomize_questions': rand_q_val} if has_rand_q else {}),
+                **({'randomize_options': rand_opt_val} if has_rand_opt else {})
+            }
+        ]
+
+        last_error = None
+        for flags in flag_variations:
+            update_fields = dict(base_update)
+            update_fields.update(flags)
+            try:
+                res = supabase.table('quizzes').update(update_fields).eq('id', clean_id).execute()
+                if not res or not getattr(res, 'data', None) or len(res.data) == 0:
+                    raise RuntimeError(f"Quiz with ID {clean_id} not found in Supabase")
+                return res.data[0]
+            except Exception as e:
+                err_str = str(e).lower()
+                last_error = e
+                if any(k in err_str for k in ('invalid input syntax for type integer', 'type boolean', '22p02', '42804')):
+                    logger.warning("Quiz update flag type attempt failed (%s), trying alternate flag types...", e)
+                    continue
+                raise
+
+        logger.error("Supabase update_quiz error: %s", last_error)
+        raise RuntimeError(f"Failed to update quiz in database: {last_error}")
+
+    @staticmethod
     def create_quiz(data):
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         quiz_id = str(uuid.uuid4())
@@ -236,7 +347,9 @@ class QuizRepository:
         is_pub = bool(data.get('is_published') if 'is_published' in data else data.get('published', False))
         duration_val = int(data.get('duration_minutes') or data.get('duration') or 15)
         total_marks_val = float(data.get('total_marks', 0.0) or 0.0)
+        total_marks_clean = int(round(total_marks_val)) if total_marks_val.is_integer() else total_marks_val
         pass_pct_val = float(data.get('passing_percentage') or data.get('pass_percentage') or 40.0)
+        pass_pct_clean = int(round(pass_pct_val)) if pass_pct_val.is_integer() else pass_pct_val
         rand_q = bool(data.get('randomize_questions', False))
         rand_opt = bool(data.get('randomize_options', False))
 
@@ -258,7 +371,7 @@ class QuizRepository:
                     is_published_status = bool(ex_quiz.get('published') or ex_quiz.get('is_published'))
                     if q_cnt == 0 and not is_published_status:
                         logger.info("Reusing unconfigured draft quiz %s for subject %s unit %s", ex_quiz['id'], subject_id, unit_num)
-                        upd = {
+                        upd_base = {
                             'title': str(data['title']).strip(),
                             'description': str(data.get('description', '') or '').strip() or None,
                             'unit_title': str(data.get('unit_title', '') or '').strip() or f"Unit {unit_num}",
@@ -266,13 +379,21 @@ class QuizRepository:
                             'division': str(data.get('division', 'All')).strip(),
                             'department': str(data.get('department', 'Computer Engineering')).strip(),
                             'duration': duration_val,
-                            'total_marks': total_marks_val,
-                            'pass_percentage': pass_pct_val,
-                            'randomize_questions': rand_q,
-                            'randomize_options': rand_opt,
+                            'total_marks': total_marks_clean,
+                            'pass_percentage': pass_pct_clean,
                             'updated_at': now
                         }
-                        supabase.table('quizzes').update(upd).eq('id', ex_quiz['id']).execute()
+                        QuizRepository._update_supabase_quiz(
+                            supabase,
+                            ex_quiz['id'],
+                            upd_base,
+                            has_pub=False,
+                            pub_val=False,
+                            has_rand_q=True,
+                            rand_q_val=rand_q,
+                            has_rand_opt=True,
+                            rand_opt_val=rand_opt
+                        )
                         return QuizRepository.get_by_id(ex_quiz['id'])
                     else:
                         raise ValueError(f"A quiz for this subject and Unit {unit_num} already exists ('{ex_quiz.get('title')}'). Please choose another unit or edit the existing quiz.")
@@ -300,12 +421,9 @@ class QuizRepository:
                 'duration': duration_val,
                 'total_questions': 0,
                 'marks_per_question': float(data.get('marks_per_question', 1.0) or 1.0),
-                'total_marks': total_marks_val,
-                'pass_percentage': pass_pct_val,
+                'total_marks': total_marks_clean,
+                'pass_percentage': pass_pct_clean,
                 'status': 'published' if is_pub else 'draft',
-                'published': is_pub,
-                'randomize_questions': rand_q,
-                'randomize_options': rand_opt,
                 'created_at': now,
                 'updated_at': now
             }
@@ -319,19 +437,15 @@ class QuizRepository:
                 except ValueError:
                     pass
 
-            try:
-                res = supabase.table('quizzes').insert(supabase_payload).execute()
-                if not res or not getattr(res, 'data', None) or len(res.data) == 0:
-                    raise RuntimeError("Supabase returned empty response upon quiz creation")
-                created = QuizRepository._normalize_quiz(res.data[0])
-                created['is_published'] = is_pub
-                created['published'] = is_pub
-                created['question_count'] = 0
-                created['total_questions'] = 0
-                return created
-            except Exception as e:
-                logger.error("Supabase create_quiz error: %s", e)
-                raise RuntimeError(f"Database error creating quiz: {e}")
+            created_row = QuizRepository._insert_supabase_quiz(supabase, supabase_payload, is_pub, rand_q, rand_opt)
+            created = QuizRepository._normalize_quiz(created_row)
+            created['is_published'] = is_pub
+            created['published'] = is_pub
+            created['randomize_questions'] = rand_q
+            created['randomize_options'] = rand_opt
+            created['question_count'] = 0
+            created['total_questions'] = 0
+            return created
 
         # Local SQLite fallback
         conn = get_db_connection()
@@ -409,40 +523,45 @@ class QuizRepository:
         
         supabase = get_supabase_client()
         if supabase:
-            update_fields = {'updated_at': now}
-            if 'title' in data: update_fields['title'] = str(data['title']).strip()
-            if 'description' in data: update_fields['description'] = str(data['description']).strip()
+            base_update = {'updated_at': now}
+            if 'title' in data: base_update['title'] = str(data['title']).strip()
+            if 'description' in data: base_update['description'] = str(data['description']).strip()
             if 'unit_number' in data:
                 try:
-                    update_fields['unit_number'] = max(1, min(4, int(data['unit_number'])))
+                    base_update['unit_number'] = max(1, min(4, int(data['unit_number'])))
                 except (ValueError, TypeError):
                     pass
-            if 'unit_title' in data: update_fields['unit_title'] = str(data['unit_title']).strip()
+            if 'unit_title' in data: base_update['unit_title'] = str(data['unit_title']).strip()
             if 'duration' in data or 'duration_minutes' in data:
                 dur = int(data.get('duration') if 'duration' in data else data.get('duration_minutes'))
-                update_fields['duration'] = dur
+                base_update['duration'] = dur
             if 'pass_percentage' in data or 'passing_percentage' in data:
                 pct = float(data.get('pass_percentage') if 'pass_percentage' in data else data.get('passing_percentage'))
-                update_fields['pass_percentage'] = pct
+                base_update['pass_percentage'] = int(round(pct)) if pct.is_integer() else pct
             if 'total_marks' in data:
-                update_fields['total_marks'] = float(data['total_marks'])
+                tm = float(data['total_marks'])
+                base_update['total_marks'] = int(round(tm)) if tm.is_integer() else tm
             if 'marks_per_question' in data:
-                update_fields['marks_per_question'] = float(data['marks_per_question'])
-            if 'randomize_questions' in data: update_fields['randomize_questions'] = bool(data['randomize_questions'])
-            if 'randomize_options' in data: update_fields['randomize_options'] = bool(data['randomize_options'])
-            if 'published' in data or 'is_published' in data:
-                pub = bool(data.get('published') if 'published' in data else data.get('is_published'))
-                update_fields['published'] = pub
-                update_fields['status'] = 'published' if pub else 'draft'
+                base_update['marks_per_question'] = float(data['marks_per_question'])
 
-            try:
-                res = supabase.table('quizzes').update(update_fields).eq('id', clean_id).execute()
-                if not res or not getattr(res, 'data', None) or len(res.data) == 0:
-                    raise RuntimeError(f"Quiz with ID {clean_id} not found in Supabase")
-                return QuizRepository.get_by_id(clean_id)
-            except Exception as e:
-                logger.error("Supabase update_quiz error: %s", e)
-                raise RuntimeError(f"Failed to update quiz in database: {e}")
+            has_pub = 'published' in data or 'is_published' in data
+            has_rand_q = 'randomize_questions' in data
+            has_rand_opt = 'randomize_options' in data
+
+            pub_val = bool(data.get('published') if 'published' in data else data.get('is_published')) if has_pub else False
+            rand_q_val = bool(data['randomize_questions']) if has_rand_q else False
+            rand_opt_val = bool(data['randomize_options']) if has_rand_opt else False
+
+            if has_pub:
+                base_update['status'] = 'published' if pub_val else 'draft'
+
+            QuizRepository._update_supabase_quiz(
+                supabase, clean_id, base_update,
+                has_pub=has_pub, pub_val=pub_val,
+                has_rand_q=has_rand_q, rand_q_val=rand_q_val,
+                has_rand_opt=has_rand_opt, rand_opt_val=rand_opt_val
+            )
+            return QuizRepository.get_by_id(clean_id)
 
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -511,17 +630,25 @@ class QuizRepository:
 
         supabase = get_supabase_client()
         if supabase:
-            try:
-                # Update published in Supabase quizzes table
-                supabase.table('quizzes').update({
-                    'published': target_status,
-                    'status': status_text,
-                    'updated_at': now
-                }).eq('id', clean_id).execute()
-                return QuizRepository.get_by_id(clean_id)
-            except Exception as e:
-                logger.error("Supabase toggle_publish error: %s", e)
-                raise RuntimeError(f"Database error toggling publish state: {e}")
+            last_err = None
+            for pub_val in (1 if target_status else 0, target_status):
+                try:
+                    res = supabase.table('quizzes').update({
+                        'published': pub_val,
+                        'status': status_text,
+                        'updated_at': now
+                    }).eq('id', clean_id).execute()
+                    if not res or not getattr(res, 'data', None) or len(res.data) == 0:
+                        raise RuntimeError(f"Quiz with ID {clean_id} not found in Supabase")
+                    return QuizRepository.get_by_id(clean_id)
+                except Exception as e:
+                    err_str = str(e).lower()
+                    last_err = e
+                    if any(k in err_str for k in ('invalid input syntax for type integer', 'type boolean', '22p02', '42804')):
+                        continue
+                    raise
+            logger.error("Supabase toggle_publish error: %s", last_err)
+            raise RuntimeError(f"Database error toggling publish state: {last_err}")
 
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -576,16 +703,25 @@ class QuizRepository:
                 total_m = sum(float(r.get('marks') or 1.0) for r in rows)
                 now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 
-                update_payload = {
-                    'total_questions': total_q,
-                    'total_marks': total_m,
-                    'updated_at': now
-                }
                 if total_q == 0:
-                    update_payload['published'] = False
-                    update_payload['status'] = 'draft'
-                
-                supabase.table('quizzes').update(update_payload).eq('id', clean_id).execute()
+                    for pub_val in (0, False):
+                        try:
+                            supabase.table('quizzes').update({
+                                'total_questions': total_q,
+                                'total_marks': int(round(total_m)) if float(total_m).is_integer() else total_m,
+                                'published': pub_val,
+                                'status': 'draft',
+                                'updated_at': now
+                            }).eq('id', clean_id).execute()
+                            break
+                        except Exception:
+                            continue
+                else:
+                    supabase.table('quizzes').update({
+                        'total_questions': total_q,
+                        'total_marks': int(round(total_m)) if float(total_m).is_integer() else total_m,
+                        'updated_at': now
+                    }).eq('id', clean_id).execute()
                 return total_q, total_m
             except Exception as e:
                 logger.error("Supabase recalculate_totals error: %s", e)

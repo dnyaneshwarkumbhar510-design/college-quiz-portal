@@ -74,6 +74,39 @@ class QuizService:
         except (ValueError, TypeError):
             data['unit_number'] = 1
 
+        # Ensure duration is a valid positive integer
+        raw_dur = data.get('duration_minutes') or data.get('duration') or 15
+        try:
+            data['duration'] = max(1, int(raw_dur))
+            data['duration_minutes'] = data['duration']
+        except (ValueError, TypeError):
+            data['duration'] = 15
+            data['duration_minutes'] = 15
+
+        # Ensure total_marks is a valid non-negative float
+        raw_tm = data.get('total_marks', 0)
+        try:
+            data['total_marks'] = max(0.0, float(raw_tm))
+        except (ValueError, TypeError):
+            data['total_marks'] = 0.0
+
+        # Ensure pass_percentage is a valid float
+        raw_pass = data.get('passing_percentage') or data.get('pass_percentage') or 40.0
+        try:
+            data['pass_percentage'] = max(1.0, min(100.0, float(raw_pass)))
+            data['passing_percentage'] = data['pass_percentage']
+        except (ValueError, TypeError):
+            data['pass_percentage'] = 40.0
+            data['passing_percentage'] = 40.0
+
+        # Sanitize flags
+        data['randomize_questions'] = bool(data.get('randomize_questions', False))
+        data['randomize_options'] = bool(data.get('randomize_options', False))
+        if 'is_published' in data or 'published' in data:
+            pub = bool(data.get('is_published') if 'is_published' in data else data.get('published', False))
+            data['is_published'] = pub
+            data['published'] = pub
+
         return QuizRepository.create_quiz(data)
 
     @staticmethod

@@ -550,5 +550,253 @@ class TestFixesVerification(unittest.TestCase):
             self.assertEqual(quizzes[0]['title'], 'Join Fallback Quiz')
             self.assertGreaterEqual(call_count['count'], 2)
 
+    def test_quiz_creation_integer_flag_types_prevent_22p02(self):
+        """
+        Verify that QuizRepository sends integer flags (0/1) to Supabase quizzes table
+        by default to match the production schema (INTEGER columns), avoiding PostgreSQL 22P02:
+        'invalid input syntax for type integer: "false"'.
+        """
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_insert = MagicMock()
+        mock_execute = MagicMock()
+
+        returned_row = {
+            'id': 'test-uuid-integer-flags-001',
+            'subject_id': 'c0000000-0000-0000-0000-000000000001',
+            'subject': 'Data Structures & Algorithms',
+            'unit_number': 1,
+            'unit_title': 'Unit 1 Foundations',
+            'title': 'Integer Flags Test Quiz',
+            'description': 'Testing integer compatibility',
+            'class_name': 'TE Computer',
+            'division': 'All',
+            'department': 'Computer Engineering',
+            'duration': 20,
+            'total_questions': 0,
+            'marks_per_question': 1.0,
+            'total_marks': 15,
+            'pass_percentage': 40,
+            'status': 'draft',
+            'published': 0,
+            'randomize_questions': 0,
+            'randomize_options': 0,
+            'created_at': '2026-10-28T00:00:00+00:00',
+            'updated_at': '2026-10-28T00:00:00+00:00'
+        }
+
+        mock_execute.return_value = MagicMock(data=[returned_row])
+        mock_insert.execute = mock_execute
+        mock_table.insert.return_value = mock_insert
+        mock_table.select.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=None)
+        mock_supabase.table.return_value = mock_table
+
+        with patch('app.database.repositories.quiz_repository.get_supabase_client', return_value=mock_supabase):
+            created = QuizRepository.create_quiz({
+                'title': 'Integer Flags Test Quiz',
+                'description': 'Testing integer compatibility',
+                'subject_id': 'c0000000-0000-0000-0000-000000000001',
+                'subject_name': 'Data Structures & Algorithms',
+                'unit_number': 1,
+                'unit_title': 'Unit 1 Foundations',
+                'class_name': 'TE Computer',
+                'division': 'All',
+                'department': 'Computer Engineering',
+                'duration': 20,
+                'total_marks': 15.0,
+                'pass_percentage': 40.0,
+                'randomize_questions': False,
+                'randomize_options': False
+            })
+
+            actual_payload = mock_table.insert.call_args[0][0]
+
+            # Primary assertions: flags sent to Supabase MUST be integers (0/1), NOT boolean False
+            self.assertEqual(actual_payload['published'], 0)
+            self.assertEqual(actual_payload['randomize_questions'], 0)
+            self.assertEqual(actual_payload['randomize_options'], 0)
+            self.assertIsInstance(actual_payload['published'], int)
+            self.assertIsInstance(actual_payload['randomize_questions'], int)
+            self.assertIsInstance(actual_payload['randomize_options'], int)
+            # Ensure they are not bools (in Python bool is a subclass of int, so check type exactly)
+            self.assertIs(type(actual_payload['published']), int)
+            self.assertIs(type(actual_payload['randomize_questions']), int)
+            self.assertIs(type(actual_payload['randomize_options']), int)
+
+            # Ensure numeric fields are typed as valid integers or numbers
+            self.assertIsInstance(actual_payload['duration'], int)
+            self.assertEqual(actual_payload['duration'], 20)
+            self.assertIsInstance(actual_payload['total_marks'], int)
+            self.assertEqual(actual_payload['total_marks'], 15)
+            self.assertIsInstance(actual_payload['pass_percentage'], int)
+            self.assertEqual(actual_payload['pass_percentage'], 40)
+            self.assertIsInstance(actual_payload['unit_number'], int)
+            self.assertEqual(actual_payload['unit_number'], 1)
+            self.assertEqual(actual_payload['total_questions'], 0)
+
+            # Verify normalized quiz dictionary returns Python booleans for UI consumption
+            self.assertFalse(created['is_published'])
+            self.assertFalse(created['published'])
+            self.assertFalse(created['randomize_questions'])
+            self.assertFalse(created['randomize_options'])
+            self.assertIs(type(created['is_published']), bool)
+            self.assertIs(type(created['published']), bool)
+            self.assertIs(type(created['randomize_questions']), bool)
+            self.assertIs(type(created['randomize_options']), bool)
+
+    def test_quiz_creation_adapts_to_boolean_columns_on_type_mismatch(self):
+        """
+        Verify that if the remote Supabase schema has BOOLEAN columns (throwing 42804
+        'column is of type boolean but expression is of type integer'), the repository
+        adaptively retries with boolean values and successfully completes quiz creation.
+        """
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+
+        returned_row = {
+            'id': 'test-uuid-boolean-flags-002',
+            'subject_id': 'c0000000-0000-0000-0000-000000000001',
+            'subject': 'Data Structures & Algorithms',
+            'unit_number': 3,
+            'unit_title': 'Unit 3 Trees',
+            'title': 'Boolean Adaptive Quiz',
+            'description': 'Testing adaptive fallback',
+            'class_name': 'TE Computer',
+            'division': 'All',
+            'department': 'Computer Engineering',
+            'duration': 30,
+            'total_questions': 0,
+            'marks_per_question': 1.0,
+            'total_marks': 20,
+            'pass_percentage': 40,
+            'status': 'draft',
+            'published': False,
+            'randomize_questions': False,
+            'randomize_options': False,
+            'created_at': '2026-10-28T00:00:00+00:00',
+            'updated_at': '2026-10-28T00:00:00+00:00'
+        }
+
+        # Mock insert: first call (with integer flags) raises 42804 type boolean error;
+        # subsequent variation succeeds
+        call_records = []
+        def fake_insert(payload):
+            call_records.append(dict(payload))
+            mock_res = MagicMock()
+            if len(call_records) == 1:
+                # First attempt with integer flags raises boolean type mismatch
+                mock_res.execute.side_effect = RuntimeError(
+                    "{'message': 'column \"published\" is of type boolean but expression is of type integer', 'code': '42804'}"
+                )
+            else:
+                # Fallback variation with boolean flags succeeds
+                mock_res.execute.return_value = MagicMock(data=[returned_row])
+            return mock_res
+
+        mock_table.insert = fake_insert
+        mock_table.select.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=None)
+        mock_supabase.table.return_value = mock_table
+
+        with patch('app.database.repositories.quiz_repository.get_supabase_client', return_value=mock_supabase):
+            created = QuizRepository.create_quiz({
+                'title': 'Boolean Adaptive Quiz',
+                'subject_id': 'c0000000-0000-0000-0000-000000000001',
+                'subject_name': 'Data Structures & Algorithms',
+                'unit_number': 3,
+                'duration': 30,
+                'total_marks': 20.0,
+                'pass_percentage': 40.0
+            })
+
+            # Verify that adaptive retry occurred
+            self.assertGreaterEqual(len(call_records), 2)
+            # First attempt sent integer flag
+            self.assertEqual(call_records[0]['published'], 0)
+            # Second attempt adapted published to boolean False
+            self.assertFalse(call_records[1]['published'])
+            self.assertIsNotNone(created)
+            self.assertEqual(created['title'], 'Boolean Adaptive Quiz')
+
+    def test_quiz_service_sanitization_and_type_casting(self):
+        """
+        Verify that QuizService.create_quiz thoroughly sanitizes all form input types
+        (strings to ints/floats, clamping unit_number to [1, 4], resolving duration and marks).
+        """
+        mock_repo_create = MagicMock()
+        mock_repo_create.return_value = {
+            'id': 'sanitized-quiz-01',
+            'title': 'Sanitized Parameters Quiz',
+            'unit_number': 2,
+            'duration': 25,
+            'duration_minutes': 25,
+            'total_marks': 30.0,
+            'pass_percentage': 50.0,
+            'passing_percentage': 50.0,
+            'randomize_questions': True,
+            'randomize_options': False
+        }
+
+        with patch('app.services.quiz_service.QuizRepository.create_quiz', mock_repo_create):
+            with patch('app.services.quiz_service.SubjectRepository.get_all', return_value=[{'id': 'c0000000-0000-0000-0000-000000000001', 'name': 'DSA'}]):
+                result = QuizService.create_quiz({
+                    'title': 'Sanitized Parameters Quiz',
+                    'unit_number': '2',
+                    'duration_minutes': '25',
+                    'total_marks': '30.0',
+                    'passing_percentage': '50.0',
+                    'randomize_questions': True,
+                    'randomize_options': False
+                })
+
+                passed_data = mock_repo_create.call_args[0][0]
+                self.assertIsInstance(passed_data['unit_number'], int)
+                self.assertEqual(passed_data['unit_number'], 2)
+                self.assertIsInstance(passed_data['duration'], int)
+                self.assertEqual(passed_data['duration'], 25)
+                self.assertIsInstance(passed_data['duration_minutes'], int)
+                self.assertEqual(passed_data['duration_minutes'], 25)
+                self.assertIsInstance(passed_data['total_marks'], float)
+                self.assertEqual(passed_data['total_marks'], 30.0)
+                self.assertIsInstance(passed_data['pass_percentage'], float)
+                self.assertEqual(passed_data['pass_percentage'], 50.0)
+                self.assertIsInstance(passed_data['randomize_questions'], bool)
+                self.assertTrue(passed_data['randomize_questions'])
+                self.assertIsInstance(passed_data['randomize_options'], bool)
+                self.assertFalse(passed_data['randomize_options'])
+
+    def test_quiz_toggle_publish_adapts_to_integer_columns(self):
+        """
+        Verify that QuizRepository.toggle_publish sends integer 1/0 for published
+        state first and falls back to boolean if necessary.
+        """
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_update = MagicMock()
+        mock_execute = MagicMock()
+
+        updated_row = {
+            'id': 'test-toggle-quiz-01',
+            'title': 'Toggle Quiz',
+            'published': 1,
+            'status': 'published',
+            'total_questions': 5,
+            'updated_at': '2026-10-28T00:00:00+00:00'
+        }
+
+        mock_execute.return_value = MagicMock(data=[updated_row])
+        mock_update.eq.return_value.execute = mock_execute
+        mock_table.update.return_value = mock_update
+        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(data=updated_row)
+        mock_supabase.table.return_value = mock_table
+
+        with patch('app.database.repositories.quiz_repository.get_supabase_client', return_value=mock_supabase):
+            with patch('app.database.repositories.quiz_repository.QuizRepository.get_by_id', return_value=updated_row):
+                QuizRepository.toggle_publish('test-toggle-quiz-01', True)
+
+                # Verify update was called with integer 1 for published
+                actual_update_payload = mock_table.update.call_args[0][0]
+                self.assertEqual(actual_update_payload['published'], 1)
+                self.assertEqual(actual_update_payload['status'], 'published')
+
 if __name__ == '__main__':
     unittest.main()
