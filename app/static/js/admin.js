@@ -29,10 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
   if (overlay) overlay.addEventListener('click', closeSidebar);
 
-  // Close drawer when any sidebar navigation link is clicked on mobile
+  // Close drawer when any sidebar navigation link is clicked on mobile or tablet
   document.querySelectorAll('.sidebar-nav a').forEach(link => {
     link.addEventListener('click', () => {
-      if (window.innerWidth <= 768) {
+      if (window.innerWidth <= 1024) {
         closeSidebar();
       }
     });
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Automatically close mobile drawer if window is resized to desktop width
   window.addEventListener('resize', () => {
-    if (window.innerWidth > 768) {
+    if (window.innerWidth > 1024) {
       closeSidebar();
     }
   });

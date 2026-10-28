@@ -102,17 +102,16 @@
           </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="admin-topbar-right" style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
           <span class="badge badge-success">
             ● Faculty Active
           </span>
-          
         </div>
       </header>
 
       <!-- Admin Page Content -->
       <div class="admin-content">
-        {% block admin_content %}{% endblock %}
+        {% block admin_content %}{% block faculty_content %}{% endblock %}{% endblock %}
       </div>
     </div>
   </div>

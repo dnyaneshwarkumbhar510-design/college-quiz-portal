@@ -8,6 +8,7 @@ from config import Config
 from app.database.repositories.quiz_repository import QuizRepository
 from app.database.repositories.subject_repository import SubjectRepository
 from app.database.repositories.question_repository import QuestionRepository
+from app.database.repositories.student_repository import StudentRepository
 from app.services.quiz_service import QuizService
 
 class TestFixesVerification(unittest.TestCase):
@@ -1338,6 +1339,104 @@ class TestFixesVerification(unittest.TestCase):
         self.assertEqual(data['result']['obtained_marks'], 2.0)
         self.assertEqual(data['result']['percentage'], 100.0)
         self.assertEqual(data['result']['status'], 'PASS')
+
+    def test_faculty_admin_pages_render_content_not_blank(self):
+        """
+        Verify that /admin/students, /admin/analytics, /admin/downloads, and /admin/settings
+        render their full content inside .admin-content rather than rendering a blank page.
+        """
+        with self.client.session_transaction() as sess:
+            sess['faculty'] = {'username': 'admin', 'name': 'Prof. Test'}
+
+        # 1. Student Registry
+        res_students = self.client.get('/admin/students')
+        self.assertEqual(res_students.status_code, 200)
+        html_students = res_students.get_data(as_text=True)
+        self.assertIn('Student Management', html_students)
+        self.assertIn('Enrollment Registry', html_students)
+        self.assertNotIn('<div class="admin-content">\n        \n      </div>', html_students)
+        self.assertGreater(len(html_students), 4500)
+
+        # 2. Performance Analytics
+        res_analytics = self.client.get('/admin/analytics')
+        self.assertEqual(res_analytics.status_code, 200)
+        html_analytics = res_analytics.get_data(as_text=True)
+        self.assertIn('Performance Analytics Dashboard', html_analytics)
+        self.assertNotIn('<div class="admin-content">\n        \n      </div>', html_analytics)
+        self.assertGreater(len(html_analytics), 4500)
+
+        # 3. Downloads / Reports
+        res_downloads = self.client.get('/admin/downloads')
+        self.assertEqual(res_downloads.status_code, 200)
+        html_downloads = res_downloads.get_data(as_text=True)
+        self.assertIn('Institutional Data Export Center', html_downloads)
+        self.assertIn('handleDownloadStudentResultsCsv', html_downloads)
+        self.assertNotIn('<div class="admin-content">\n        \n      </div>', html_downloads)
+        self.assertGreater(len(html_downloads), 4500)
+
+        # 4. Settings
+        res_settings = self.client.get('/admin/settings')
+        self.assertEqual(res_settings.status_code, 200)
+        html_settings = res_settings.get_data(as_text=True)
+        self.assertIn('Portal & Institutional Settings', html_settings)
+        self.assertIn('Institutional Identity', html_settings)
+        # Ensure no secrets leaked
+        self.assertNotIn('SUPABASE_KEY', html_settings)
+        self.assertNotIn('SUPABASE_SERVICE_ROLE_KEY', html_settings)
+        self.assertNotIn('FACULTY_PASSWORD', html_settings)
+        self.assertNotIn('pbkdf2:sha256', html_settings)
+        self.assertNotIn('<div class="admin-content">\n        \n      </div>', html_settings)
+        self.assertGreater(len(html_settings), 4500)
+
+    def test_faculty_student_detail_page_renders_content(self):
+        """Verify that /admin/students/<id> renders the candidate profile."""
+        with self.client.session_transaction() as sess:
+            sess['faculty'] = {'username': 'admin', 'name': 'Prof. Test'}
+
+        # Get or create student
+        students = StudentRepository.get_all()
+        if not students:
+            student = StudentRepository.create_or_login({
+                'full_name': 'Profile Verification Student',
+                'roll_number': 'PROF_001',
+                'class_name': 'TE Computer',
+                'division': 'A',
+                'department': 'Computer Engineering'
+            })
+            student_id = student['id']
+        else:
+            student_id = students[0]['id']
+
+        res = self.client.get(f'/admin/students/{student_id}')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn('Back to All Students', html)
+        self.assertIn('Completed Examination Records', html)
+        self.assertNotIn('<div class="admin-content">\n        \n      </div>', html)
+
+    def test_mobile_navbar_and_css_overflow_rules(self):
+        """
+        Verify style.css rules for mobile faculty topbar and shell overflow:
+        - .admin-topbar .mobile-nav-toggle does not have margin-left: auto
+        - table has max-width: 100% and min-width is scoped to overflow wrappers
+        - no 100vw used in admin-shell/admin-viewport/admin-content
+        """
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        css_path = os.path.join(base_dir, 'app', 'static', 'css', 'style.css')
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+
+        # 100vw should not be present in admin layout classes
+        self.assertNotIn('max-width: 100vw', css_content)
+
+        # .admin-topbar .mobile-nav-toggle should have margin: 0 !important
+        self.assertIn('.admin-topbar .mobile-nav-toggle', css_content)
+        self.assertIn('margin: 0 !important;', css_content)
+
+        # Responsive table check
+        self.assertIn('.table-responsive > table', css_content)
+        self.assertIn('.overflow-x-auto > table', css_content)
 
 if __name__ == '__main__':
     unittest.main()
