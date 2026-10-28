@@ -3,26 +3,26 @@
 {% block title %}Performance Analytics{% endblock %}
 
 {% block admin_content %}
-<div class="space-y-6">
-  <!-- Title & Unit Filter -->
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <div>
-      <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Deep Metrics</span>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Performance Analytics Dashboard</h1>
-      <p class="text-xs text-slate-500 font-medium mt-0.5">
+<div>
+  <!-- Page Header & Unit Filter -->
+  <div class="admin-page-header">
+    <div class="admin-page-title-group">
+      <span class="section-tag">Deep Metrics</span>
+      <h1>Performance Analytics Dashboard</h1>
+      <p>
         Live statistical distribution, curriculum unit comparisons, and passing ratios computed from verified database attempts.
       </p>
     </div>
 
     <!-- Unit Filter Tabs -->
-    <div class="bg-white p-1 rounded-xl border border-slate-200/90 shadow-2xs flex items-center space-x-1 overflow-x-auto max-w-full">
+    <div class="admin-unit-filter-tabs">
       <a href="{{ url_for('analytics.analytics_page', unit=0) }}"
-         class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-all {% if current_unit == 0 %}bg-[#0f2744] text-white shadow-xs{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
+         class="btn btn-sm {% if current_unit == 0 %}btn-navy{% else %}btn-outline-dark{% endif %}">
         All Units
       </a>
       {% for u in [1, 2, 3, 4] %}
       <a href="{{ url_for('analytics.analytics_page', unit=u) }}"
-         class="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition-all {% if current_unit == u %}bg-[#0f2744] text-white shadow-xs{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
+         class="btn btn-sm {% if current_unit == u %}btn-navy{% else %}btn-outline-dark{% endif %}">
         Unit {{ u }}
       </a>
       {% endfor %}
@@ -30,121 +30,124 @@
   </div>
 
   <!-- Primary Statistical KPI Grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="block text-xs font-bold text-slate-500 uppercase">Class Average</span>
-      <span class="text-2xl font-black text-slate-900 mt-1 block">
+  <div class="stat-cards-grid">
+    <div class="stat-card">
+      <span class="stat-card-title">Class Average</span>
+      <div class="stat-card-value" style="color: #0f172a;">
         {% if stats.total_attempts > 0 %}{{ stats.average_score }}%{% else %}N/A{% endif %}
-      </span>
-      <span class="text-[11px] text-slate-400">Institutional Passing Standard: 40%</span>
+      </div>
+      <span class="stat-card-desc">Institutional Passing Standard: 40%</span>
     </div>
 
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="block text-xs font-bold text-slate-500 uppercase">Pass / Fail Ratio</span>
-      <span class="text-2xl font-black text-emerald-600 mt-1 block">
+    <div class="stat-card">
+      <span class="stat-card-title">Pass / Fail Ratio</span>
+      <div class="stat-card-value" style="color: #16a34a;">
         {% if stats.total_attempts > 0 %}
-          {{ stats.pass_percentage }}% <span class="text-xs font-bold text-red-500">/ {{ stats.fail_percentage }}%</span>
+          {{ stats.pass_percentage }}% <span style="font-size: 15px; color: #dc2626; font-weight: 700;">/ {{ stats.fail_percentage }}%</span>
         {% else %}
           N/A
         {% endif %}
-      </span>
-      <span class="text-[11px] text-slate-400">
+      </div>
+      <span class="stat-card-desc">
         {% if stats.total_attempts > 0 %}{{ stats.passed_count }} Passed, {{ stats.failed_count }} Failed{% else %}0 attempts recorded{% endif %}
       </span>
     </div>
 
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="block text-xs font-bold text-slate-500 uppercase">Evaluations Analyzed</span>
-      <span class="text-2xl font-black text-blue-600 mt-1 block">{{ stats.total_attempts }}</span>
-      <span class="text-[11px] text-slate-400">Total verified submissions</span>
+    <div class="stat-card">
+      <span class="stat-card-title">Evaluations Analyzed</span>
+      <div class="stat-card-value" style="color: #2563eb;">{{ stats.total_attempts }}</div>
+      <span class="stat-card-desc">Total verified submissions</span>
     </div>
 
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-      <span class="block text-xs font-bold text-slate-500 uppercase">Enrollment & Quizzes</span>
-      <span class="text-2xl font-black text-indigo-600 mt-1 block">{{ stats.total_students }}</span>
-      <span class="text-[11px] text-slate-400">{{ stats.total_quizzes }} Quizzes published</span>
+    <div class="stat-card">
+      <span class="stat-card-title">Enrollment & Quizzes</span>
+      <div class="stat-card-value" style="color: #0f2744;">{{ stats.total_students }}</div>
+      <span class="stat-card-desc">{{ stats.total_quizzes }} Quizzes published</span>
     </div>
   </div>
 
   <!-- Secondary Metrics Strip: Highest & Lowest Score -->
   {% if stats.total_attempts > 0 %}
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+  <div class="stat-cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 24px;">
+    <div class="stat-card" style="display: flex; justify-content: space-between; align-items: center;">
       <div>
-        <span class="block text-xs font-bold text-slate-500 uppercase">Highest Score Secured</span>
-        <span class="text-xl font-black text-emerald-700 mt-0.5 block">{{ stats.highest_score }} Marks</span>
+        <span class="stat-card-title">Highest Score Secured</span>
+        <div class="stat-card-value" style="color: #16a34a; font-size: 22px;">{{ stats.highest_score }} Marks</div>
+        <span class="stat-card-desc">Top examination mark recorded</span>
       </div>
-      <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+      <div style="width: 44px; height: 44px; border-radius: 50%; background-color: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 20px;">
         🏆
       </div>
     </div>
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+
+    <div class="stat-card" style="display: flex; justify-content: space-between; align-items: center;">
       <div>
-        <span class="block text-xs font-bold text-slate-500 uppercase">Lowest Score Recorded</span>
-        <span class="text-xl font-black text-slate-700 mt-0.5 block">{{ stats.lowest_score }} Marks</span>
+        <span class="stat-card-title">Lowest Score Recorded</span>
+        <div class="stat-card-value" style="color: #475569; font-size: 22px;">{{ stats.lowest_score }} Marks</div>
+        <span class="stat-card-desc">Minimum recorded submission mark</span>
       </div>
-      <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">
+      <div style="width: 44px; height: 44px; border-radius: 50%; background-color: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 20px;">
         📉
       </div>
     </div>
   </div>
   {% endif %}
 
-  <!-- Visual Analytics Charts OR Real Empty State -->
+  <!-- Visual Analytics Charts OR Empty State -->
   {% if stats.total_attempts > 0 %}
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="admin-analytics-charts-grid">
     <!-- Chart 1: Score Range Distribution -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-      <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
-        <h3 class="text-sm font-bold text-slate-900">Score Range Distribution</h3>
-        <p class="text-xs text-slate-500">Student percentage quintiles computed from database</p>
+    <div class="admin-chart-card">
+      <div class="admin-chart-header">
+        <h3 class="admin-chart-title">Score Range Distribution</h3>
+        <p class="admin-chart-subtitle">Student percentage quintiles computed from database</p>
       </div>
-      <div class="p-4" style="height: 280px; position: relative;">
+      <div class="admin-chart-body">
         <canvas id="scoreDistChart"></canvas>
       </div>
     </div>
 
     <!-- Chart 2: Curriculum Unit-Wise Mastery -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-      <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
-        <h3 class="text-sm font-bold text-slate-900">Curriculum Unit-Wise Mastery</h3>
-        <p class="text-xs text-slate-500">Average percentage achieved across syllabus units</p>
+    <div class="admin-chart-card">
+      <div class="admin-chart-header">
+        <h3 class="admin-chart-title">Curriculum Unit-Wise Mastery</h3>
+        <p class="admin-chart-subtitle">Average percentage achieved across syllabus units</p>
       </div>
-      <div class="p-4" style="height: 280px; position: relative;">
+      <div class="admin-chart-body">
         <canvas id="unitCompChart"></canvas>
       </div>
     </div>
 
     <!-- Chart 3: Pass vs Fail Ratio -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-      <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
-        <h3 class="text-sm font-bold text-slate-900">Pass vs Fail Ratio</h3>
-        <p class="text-xs text-slate-500">Proportion of student attempts meeting institutional standard (40%)</p>
+    <div class="admin-chart-card">
+      <div class="admin-chart-header">
+        <h3 class="admin-chart-title">Pass vs Fail Ratio</h3>
+        <p class="admin-chart-subtitle">Proportion of student attempts meeting institutional standard (40%)</p>
       </div>
-      <div class="p-4 flex items-center justify-center" style="height: 280px; position: relative;">
+      <div class="admin-chart-body">
         <canvas id="passFailChart"></canvas>
       </div>
     </div>
 
     <!-- Chart 4: Question Accuracy Breakdown -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-      <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
-        <h3 class="text-sm font-bold text-slate-900">Question Accuracy Breakdown</h3>
-        <p class="text-xs text-slate-500">Total answers recorded across submitted exams</p>
+    <div class="admin-chart-card">
+      <div class="admin-chart-header">
+        <h3 class="admin-chart-title">Question Accuracy Breakdown</h3>
+        <p class="admin-chart-subtitle">Total answers recorded across submitted exams</p>
       </div>
-      <div class="p-4 flex items-center justify-center" style="height: 280px; position: relative;">
+      <div class="admin-chart-body">
         <canvas id="accuracyChart"></canvas>
       </div>
     </div>
 
-    <!-- Chart 5: Division-Wise Performance (If multiple divisions present) -->
+    <!-- Chart 5: Division-Wise Performance Breakdown -->
     {% if stats.divisionStats and stats.divisionStats|length > 0 %}
-    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden lg:col-span-2">
-      <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5">
-        <h3 class="text-sm font-bold text-slate-900">Division-Wise Performance Breakdown</h3>
-        <p class="text-xs text-slate-500">Comparison of average percentage and attempts across academic divisions</p>
+    <div class="admin-chart-card admin-chart-card-full">
+      <div class="admin-chart-header">
+        <h3 class="admin-chart-title">Division-Wise Performance Breakdown</h3>
+        <p class="admin-chart-subtitle">Comparison of average percentage and attempts across academic divisions</p>
       </div>
-      <div class="p-4" style="height: 260px; position: relative;">
+      <div class="admin-chart-body" style="height: 300px;">
         <canvas id="divisionPerfChart"></canvas>
       </div>
     </div>
@@ -260,7 +263,7 @@
             datasets: [{
               label: 'Average Score %',
               data: divStats.map(d => d.averagePercentage),
-              backgroundColor: '#6366f1',
+              backgroundColor: '#0f2744',
               borderRadius: 6
             }]
           },
@@ -278,10 +281,10 @@
   </script>
   {% else %}
   <!-- Empty Analytics State -->
-  <div class="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-    <div style="font-size: 36px; margin-bottom: 12px;">📊</div>
-    <h3 class="text-base font-bold text-slate-800 mb-1">No analytics available yet.</h3>
-    <p class="text-xs text-slate-500 max-w-md mx-auto">
+  <div class="admin-empty-card">
+    <div class="admin-empty-icon">📊</div>
+    <h3 class="admin-empty-title">No analytics available yet.</h3>
+    <p class="admin-empty-desc">
       No analytics available yet. Students must complete quizzes before analytics can be generated.
     </p>
   </div>

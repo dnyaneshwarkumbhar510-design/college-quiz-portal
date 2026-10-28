@@ -1438,5 +1438,72 @@ class TestFixesVerification(unittest.TestCase):
         self.assertIn('.table-responsive > table', css_content)
         self.assertIn('.overflow-x-auto > table', css_content)
 
+    def test_all_faculty_and_student_routes_render_cleanly(self):
+        """
+        Verify that all core admin and student routes render cleanly with HTTP 200:
+        - Faculty Dashboard
+        - Create Quiz
+        - Manage Quizzes
+        - Question Bank
+        - Results & Rankings
+        - Student Login
+        - Student Dashboard
+        - Settings 5 structured cards
+        """
+        with self.client.session_transaction() as sess:
+            sess['faculty'] = {'username': 'admin', 'name': 'Prof. Test'}
+
+        # Faculty Dashboard
+        res = self.client.get('/admin/dashboard')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Welcome, Faculty', res.get_data(as_text=True))
+
+        # Create Quiz
+        res = self.client.get('/admin/quizzes/new')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Create New Quiz', res.get_data(as_text=True))
+
+        # Manage Quizzes
+        res = self.client.get('/admin/quizzes')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Quiz Management', res.get_data(as_text=True))
+
+        # Question Bank
+        res = self.client.get('/admin/questions')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Question Bank', res.get_data(as_text=True))
+
+        # Results & Rankings
+        res = self.client.get('/admin/results')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Results &', res.get_data(as_text=True))
+
+        # Settings 5 cards verification
+        res_settings = self.client.get('/admin/settings')
+        self.assertEqual(res_settings.status_code, 200)
+        html_set = res_settings.get_data(as_text=True)
+        self.assertIn('Institutional Identity & Application Version', html_set)
+        self.assertIn('Database Engine & Storage Status', html_set)
+        self.assertIn('Security & Data Integrity', html_set)
+        self.assertIn('Institutional Examination Parameters', html_set)
+        self.assertIn('Session & Security Configuration', html_set)
+        self.assertIn('OPERATIONAL', html_set)
+
+        # Student Login Page
+        res = self.client.get('/login/student')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Student Examination Entry', res.get_data(as_text=True))
+
+        # Student Dashboard
+        students = StudentRepository.get_all()
+        if students:
+            st = students[0]
+            with self.client.session_transaction() as s_sess:
+                s_sess['student'] = st
+                s_sess['student_id'] = st['id']
+            res_st = self.client.get('/student/dashboard')
+            self.assertEqual(res_st.status_code, 200)
+            self.assertIn('Student Dashboard', res_st.get_data(as_text=True))
+
 if __name__ == '__main__':
     unittest.main()

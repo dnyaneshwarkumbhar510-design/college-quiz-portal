@@ -3,142 +3,237 @@
 {% block title %}Institutional Settings{% endblock %}
 
 {% block admin_content %}
-<div class="max-w-4xl mx-auto space-y-6">
-  <!-- Title -->
-  <div>
-    <span class="text-xs font-bold uppercase tracking-wider text-blue-700">System Parameters</span>
-    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Portal & Institutional Settings</h1>
-    <p class="text-xs text-slate-500 font-medium mt-0.5">
-      Verified institutional parameters, database connection integrity, and security policies governing examinations.
-    </p>
+<div class="admin-settings-container">
+  <!-- Page Header -->
+  <div class="admin-page-header" style="margin-bottom: 8px;">
+    <div class="admin-page-title-group">
+      <span class="section-tag">System Parameters</span>
+      <h1>Portal & Institutional Settings</h1>
+      <p>
+        Verified institutional parameters, database connection integrity, and security policies governing examinations.
+      </p>
+    </div>
   </div>
 
-  <!-- Card 1: Institutional Portal Identity -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex justify-between items-center">
-      <div class="flex items-center space-x-2.5">
-        <span class="text-xl">🏛️</span>
-        <h2 class="text-base font-bold text-slate-900">Institutional Identity & Application Version</h2>
+  <!-- CARD 1: Institutional Identity & Application Version -->
+  <div class="admin-settings-card">
+    <div class="admin-settings-card-header">
+      <div class="admin-settings-card-header-left">
+        <span style="font-size: 20px;">🏛️</span>
+        <div>
+          <h2 class="admin-settings-card-title">Institutional Identity & Application Version</h2>
+          <p class="admin-settings-card-subtitle">Official establishment identity and environment specifications</p>
+        </div>
       </div>
-      <span class="badge badge-neutral text-xs font-semibold">
+      <span class="badge badge-navy">
         Read-Only Configuration
       </span>
     </div>
 
-    <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-      <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-        <span class="text-slate-500 block text-[10px] uppercase font-bold">Portal Name</span>
-        <strong class="text-slate-900 text-sm">Central College Online Quiz & Examination Portal</strong>
-      </div>
+    <div class="admin-settings-card-body">
+      <div class="admin-settings-def-grid">
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">Portal Name</span>
+          <span class="admin-settings-value">Central College Online Quiz & Examination Portal</span>
+        </div>
 
-      <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-        <span class="text-slate-500 block text-[10px] uppercase font-bold">College / Institution</span>
-        <strong class="text-slate-900 text-sm">Central College of Engineering</strong>
-      </div>
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">College / Institution</span>
+          <span class="admin-settings-value">Central College of Engineering</span>
+        </div>
 
-      <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-        <span class="text-slate-500 block text-[10px] uppercase font-bold">Academic Session</span>
-        <strong class="text-slate-900 text-sm">2025–2026 Continuous Assessment</strong>
-      </div>
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">Academic Session</span>
+          <span class="admin-settings-value">2025–2026 Continuous Assessment</span>
+        </div>
 
-      <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-        <span class="text-slate-500 block text-[10px] uppercase font-bold">Technology Stack & Version</span>
-        <strong class="text-slate-900 text-sm">v2.0.0 (Python 3 / Flask / Supabase Relational)</strong>
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">Technology Stack & Version</span>
+          <span class="admin-settings-value">v2.0.0 (Python 3 / Flask / Supabase Relational)</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Card 2: Database Connection & Storage Status (Without Exposing Secrets) -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex justify-between items-center">
-      <div class="flex items-center space-x-2.5">
-        <span class="text-xl">🗄️</span>
-        <h2 class="text-base font-bold text-slate-900">Database Engine & Storage Status</h2>
+  <!-- CARD 2: Database Engine & Storage Status -->
+  <div class="admin-settings-card">
+    <div class="admin-settings-card-header">
+      <div class="admin-settings-card-header-left">
+        <span style="font-size: 20px;">🗄️</span>
+        <div>
+          <h2 class="admin-settings-card-title">Database Engine & Storage Status</h2>
+          <p class="admin-settings-card-subtitle">Primary persistence engine connectivity and relational integrity</p>
+        </div>
       </div>
-      <span class="badge badge-success font-semibold text-xs">
+      <span class="badge badge-success" style="font-size: 12px; padding: 5px 12px;">
         ● OPERATIONAL
       </span>
     </div>
 
-    <div class="p-6 space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-        <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-          <span class="text-slate-500 block text-[10px] uppercase font-bold">Primary Database Engine</span>
-          <strong class="text-slate-900 text-sm">Supabase PostgreSQL</strong>
+    <div class="admin-settings-card-body">
+      <div class="admin-settings-def-grid">
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">Database Status</span>
+          <span class="admin-settings-value" style="color: #16a34a;">● OPERATIONAL</span>
         </div>
-        <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-          <span class="text-slate-500 block text-[10px] uppercase font-bold">Persistence Model</span>
-          <strong class="text-slate-900 text-sm">Authoritative Relational Tables</strong>
+
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">Primary Database Engine</span>
+          <span class="admin-settings-value">Supabase PostgreSQL</span>
         </div>
-        <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-          <span class="text-slate-500 block text-[10px] uppercase font-bold">Relational Join Mapping</span>
-          <strong class="text-slate-900 text-sm">quiz_questions Enforced</strong>
+
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">Persistence Model</span>
+          <span class="admin-settings-value">Authoritative Relational Tables</span>
+        </div>
+
+        <div class="admin-settings-def-item">
+          <span class="admin-settings-label">Relational Join Mapping</span>
+          <span class="admin-settings-value">quiz_questions Enforced</span>
+        </div>
+
+        <div class="admin-settings-def-item" style="grid-column: 1 / -1;">
+          <span class="admin-settings-label">Security / RLS</span>
+          <span class="admin-settings-value" style="color: #2563eb;">Active (Row-Level Security & Schema Isolation)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 3: Security & Data Integrity -->
+  <div class="admin-settings-card">
+    <div class="admin-settings-card-header">
+      <div class="admin-settings-card-header-left">
+        <span style="font-size: 20px;">🛡️</span>
+        <div>
+          <h2 class="admin-settings-card-title">Security & Data Integrity</h2>
+          <p class="admin-settings-card-subtitle">Cryptographic enforcement, relational isolation, and audit timestamps</p>
+        </div>
+      </div>
+      <span class="badge badge-blue">
+        ● ENFORCED
+      </span>
+    </div>
+
+    <div class="admin-settings-card-body">
+      <!-- 4 Readable Status Panels -->
+      <div class="admin-settings-sec-grid">
+        <div class="admin-settings-sec-item">
+          <span class="admin-settings-sec-label">Row Level Security</span>
+          <span class="badge badge-success">Active</span>
+        </div>
+
+        <div class="admin-settings-sec-item">
+          <span class="admin-settings-sec-label">Foreign Key Integrity</span>
+          <span class="badge badge-success">Verified</span>
+        </div>
+
+        <div class="admin-settings-sec-item">
+          <span class="admin-settings-sec-label">Question Answer Key Protection</span>
+          <span class="badge badge-success">Active</span>
+        </div>
+
+        <div class="admin-settings-sec-item">
+          <span class="admin-settings-sec-label">Server-Side Submission Timestamp</span>
+          <span class="badge badge-success">Active</span>
         </div>
       </div>
 
-      <div class="bg-blue-50/60 border border-blue-200 rounded-xl p-4 text-xs text-blue-900 space-y-1.5">
-        <div class="font-bold flex items-center space-x-1.5 text-blue-950">
-          <span class="text-sm">🛡️ Row Level Security (RLS) & Cryptographic Storage Active</span>
-        </div>
-        <p class="leading-relaxed text-[11px] text-blue-800">
-          All data operations are strictly executed against the relational schema with verified foreign keys, the <code>quiz_questions</code> mapping table, and transaction safety. Students have restricted access to only their personal examination records and cannot view faculty-authored question answer keys before submission. All examination submission timestamps are synchronized server-side.
+      <!-- Compact Explanatory Information Panel -->
+      <div class="admin-settings-info-box">
+        <p>
+          All examination transactions are strictly verified against the relational schema with enforced foreign keys, the <code>quiz_questions</code> mapping table, and transactional safety. Candidates have isolated access to only their personal examination records and cannot inspect faculty-authored answer keys before submission. All submission timestamps are authoritative and synchronized server-side.
         </p>
       </div>
     </div>
   </div>
 
-  <!-- Card 3: Institutional Examination Rules -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="bg-slate-50 border-b border-slate-200/80 px-6 py-4">
-      <h2 class="text-base font-bold text-slate-900">Institutional Examination Parameters</h2>
-      <p class="text-xs text-slate-500">System-wide default standards for continuous assessments</p>
+  <!-- CARD 4: Institutional Examination Parameters -->
+  <div class="admin-settings-card">
+    <div class="admin-settings-card-header">
+      <div class="admin-settings-card-header-left">
+        <span style="font-size: 20px;">📋</span>
+        <div>
+          <h2 class="admin-settings-card-title">Institutional Examination Parameters</h2>
+          <p class="admin-settings-card-subtitle">System-wide default standards for continuous assessments</p>
+        </div>
+      </div>
+      <span class="badge badge-navy">
+        Academic Policy
+      </span>
     </div>
-    <div class="p-6 space-y-3 text-xs text-slate-700 divide-y divide-slate-100">
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Passing Percentage Criterion:</span>
-        <strong class="text-slate-900">40.0% Minimum Passing Grade</strong>
-      </div>
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Standard Unit Exam Duration:</span>
-        <strong class="text-slate-900">Configurable (Default 15 Minutes)</strong>
-      </div>
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Quiz Question Count Flexibility:</span>
-        <strong class="text-slate-900">Dynamic & Flexible (5, 10, 15, 20, 30, 40+ Questions)</strong>
-      </div>
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Academic Division Support:</span>
-        <strong class="text-slate-900">17 Standard Divisions (A through Q)</strong>
-      </div>
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Combined Curriculum Score:</span>
-        <strong class="text-slate-900">60 Marks Total (4 Units × 15 Marks)</strong>
+
+    <div class="admin-settings-card-body">
+      <div class="admin-settings-row-list">
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Passing Percentage Criterion</span>
+          <span class="admin-settings-row-value">40.0% Minimum Passing Grade</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Standard Unit Exam Duration</span>
+          <span class="admin-settings-row-value">Configurable / Default 15 Minutes</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Quiz Question Count Flexibility</span>
+          <span class="admin-settings-row-value">Dynamic: 5, 10, 15, 20, 30, 40+ Questions</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Academic Division Support</span>
+          <span class="admin-settings-row-value">17 Standard Divisions (A–Q)</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Combined Curriculum Score</span>
+          <span class="admin-settings-row-value">60 Marks (4 Units × 15 Marks)</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Card 4: Session & Security Policy -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="bg-slate-50 border-b border-slate-200/80 px-6 py-4">
-      <h2 class="text-base font-bold text-slate-900">Session & Security Configuration</h2>
-      <p class="text-xs text-slate-500">Session persistence and cookie security parameters</p>
+  <!-- CARD 5: Session & Security Configuration -->
+  <div class="admin-settings-card" style="margin-bottom: 12px;">
+    <div class="admin-settings-card-header">
+      <div class="admin-settings-card-header-left">
+        <span style="font-size: 20px;">🔐</span>
+        <div>
+          <h2 class="admin-settings-card-title">Session & Security Configuration</h2>
+          <p class="admin-settings-card-subtitle">Session persistence and cookie security parameters</p>
+        </div>
+      </div>
+      <span class="badge badge-navy">
+        Security Controls
+      </span>
     </div>
-    <div class="p-6 space-y-3 text-xs text-slate-700 divide-y divide-slate-100">
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Session Lifetime:</span>
-        <strong class="text-slate-900">14 Days Persistent Session</strong>
-      </div>
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Cookie Flags:</span>
-        <strong class="text-slate-900">HttpOnly = True, SameSite = Lax</strong>
-      </div>
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Candidate Authentication:</span>
-        <strong class="text-slate-900">Verified Roll Number + Institutional Division</strong>
-      </div>
-      <div class="flex justify-between py-2">
-        <span class="font-medium">Credential Protection:</span>
-        <strong class="text-slate-900">Server-Side Protected (Zero Frontend Exposure)</strong>
+
+    <div class="admin-settings-card-body">
+      <div class="admin-settings-row-list">
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Session Lifetime</span>
+          <span class="admin-settings-row-value">14 Days Persistent Session</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">HttpOnly Flag</span>
+          <span class="admin-settings-row-value">Enabled (True)</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">SameSite Cookie Policy</span>
+          <span class="admin-settings-row-value">Lax</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Candidate Authentication</span>
+          <span class="admin-settings-row-value">Verified Roll Number + Institutional Division</span>
+        </div>
+
+        <div class="admin-settings-row">
+          <span class="admin-settings-row-label">Credential Protection</span>
+          <span class="admin-settings-row-value">Server-Side Protected (Zero Frontend Exposure)</span>
+        </div>
       </div>
     </div>
   </div>

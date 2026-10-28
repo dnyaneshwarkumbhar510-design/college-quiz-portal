@@ -3,29 +3,126 @@
 {% block title %}Downloads & Reports{% endblock %}
 
 {% block admin_content %}
-<div class="space-y-6 max-w-5xl mx-auto">
-  <!-- Title -->
-  <div>
-    <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Official Assessment Reports</span>
-    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Institutional Data Export Center</h1>
-    <p class="text-xs text-slate-500 font-medium mt-0.5">
-      Export verified examination records, individual quiz results, student registry data, and aggregated 60-mark curriculum spreadsheets directly from the database.
-    </p>
+<div>
+  <!-- Page Header -->
+  <div class="admin-page-header">
+    <div class="admin-page-title-group">
+      <span class="section-tag">Official Assessment Reports</span>
+      <h1>Institutional Data Export Center</h1>
+      <p>
+        Export verified examination records, individual quiz results, student registry data, and aggregated 60-mark curriculum spreadsheets directly from the database.
+      </p>
+    </div>
   </div>
 
-  <!-- Filter Selector Card (Section 19) -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-    <div class="bg-slate-50 border-b border-slate-200/80 px-4 py-3.5 flex items-center space-x-2">
-      <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <div id="exportStatusMsg" class="hidden alert alert-warning" style="margin-bottom: 20px;"></div>
+
+  <!-- Report Cards Grid (Desktop: 3 per row, Tablet: 2 per row, Mobile: 1 per row) -->
+  <div class="admin-downloads-grid">
+    <!-- Card 1: Student Examination Results CSV -->
+    <div class="admin-download-card">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div class="admin-download-icon-wrap" style="background-color: #2563eb;">
+            <svg style="width: 22px; height: 22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+          <span class="badge badge-blue">Filtered Submissions</span>
+        </div>
+        <h3 class="admin-download-title">Student Results CSV</h3>
+        <p class="admin-download-desc">
+          Export candidate submission scores filtered by active Quiz, Division, and Class selections, including marks obtained, percentage, and submission timestamps.
+        </p>
+      </div>
+
+      <div>
+        <button type="button"
+                onclick="handleDownloadStudentResultsCsv()"
+                class="btn btn-primary"
+                style="width: 100%; justify-content: center; font-size: 12px; font-weight: 700;">
+          <svg style="width: 16px; height: 16px; margin-right: 6px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download Filtered Results CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Card 2: Student Registry Performance CSV -->
+    <div class="admin-download-card">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div class="admin-download-icon-wrap" style="background-color: #0f2744;">
+            <svg style="width: 22px; height: 22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+          </div>
+          <span class="badge badge-navy">Candidate Registry</span>
+        </div>
+        <h3 class="admin-download-title">Student Performance Registry CSV</h3>
+        <p class="admin-download-desc">
+          Export full enrollment registry with roll numbers, academic divisions, departments, total attempt counts, and average cumulative performance.
+        </p>
+      </div>
+
+      <div>
+        <button type="button"
+                onclick="handleDownloadStudentRegistryCsv()"
+                class="btn btn-outline-dark"
+                style="width: 100%; justify-content: center; font-size: 12px; font-weight: 700;">
+          <svg style="width: 16px; height: 16px; margin-right: 6px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download Candidate Registry CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Card 3: Overall 60-Mark Combined Assessment CSV -->
+    <div class="admin-download-card admin-download-card-featured">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div class="admin-download-icon-wrap" style="background-color: #1e3a8a;">
+            <svg style="width: 22px; height: 22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <span class="badge badge-success">Combined 60 Marks</span>
+        </div>
+        <h3 class="admin-download-title">Overall 60-Mark Assessment Report</h3>
+        <p class="admin-download-desc">
+          Aggregated institutional assessment report combining Unit 1, Unit 2, Unit 3, and Unit 4 marks per student with total overall percentage and passing status.
+        </p>
+      </div>
+
+      <div>
+        <button type="button"
+                onclick="handleDownloadOverall60MarksCsv()"
+                class="btn btn-navy"
+                style="width: 100%; justify-content: center; font-size: 12px; font-weight: 700;">
+          <svg style="width: 16px; height: 16px; margin-right: 6px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download Overall 60-Mark Results CSV
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Selector Card (Below Report Cards) -->
+  <div class="admin-downloads-filter-card">
+    <div class="admin-downloads-filter-header">
+      <svg style="width: 16px; height: 16px; color: #2563eb;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
       </svg>
-      <h3 class="text-sm font-bold text-slate-900">Configure Filter Parameters for Exports</h3>
+      <span>Configure Export Filter Parameters</span>
     </div>
-    <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="admin-downloads-filter-body">
       <!-- Target Quiz -->
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Target Quiz</label>
-        <select id="downloadQuizSelect" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+        <label class="form-label" for="downloadQuizSelect">Target Examination Quiz</label>
+        <select id="downloadQuizSelect" class="form-control">
           <option value="ALL">All Available Quizzes</option>
           {% for q in quizzes %}
           <option value="{{ q.id }}">{{ q.title }} (Unit {{ q.unit_number }})</option>
@@ -35,8 +132,8 @@
 
       <!-- Target Division -->
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Division Filter</label>
-        <select id="downloadDivisionSelect" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+        <label class="form-label" for="downloadDivisionSelect">Academic Division Filter</label>
+        <select id="downloadDivisionSelect" class="form-control">
           <option value="ALL">All Divisions</option>
           {% for div in divisions %}
           <option value="{{ div }}">Division {{ div }}</option>
@@ -46,117 +143,13 @@
 
       <!-- Target Class -->
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Class / Year</label>
-        <select id="downloadClassSelect" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-[#0f2744]">
+        <label class="form-label" for="downloadClassSelect">Target Class / Year</label>
+        <select id="downloadClassSelect" class="form-control">
           <option value="ALL">All Classes</option>
           {% for c in classes %}
           <option value="{{ c }}">{{ c }}</option>
           {% endfor %}
         </select>
-      </div>
-    </div>
-  </div>
-
-  <div id="exportStatusMsg" class="hidden alert alert-warning"></div>
-
-  <!-- Download Cards Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <!-- Card 1: Student Results CSV -->
-    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
-      <div>
-        <div class="flex justify-between items-start">
-          <span class="p-2 rounded-lg bg-blue-600 text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-          </span>
-          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
-            Filtered Submissions
-          </span>
-        </div>
-        <h3 class="text-base font-bold text-slate-900 mt-3">
-          Student Examination Results CSV
-        </h3>
-        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-          Export candidate submission scores filtered by active Quiz, Division, and Class selections, including marks obtained, percentage, and submission timestamps.
-        </p>
-      </div>
-
-      <div class="pt-5">
-        <button type="button"
-                onclick="handleDownloadStudentResultsCsv()"
-                class="btn btn-primary w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          Download Filtered Results CSV
-        </button>
-      </div>
-    </div>
-
-    <!-- Card 2: Student Registry Performance CSV -->
-    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
-      <div>
-        <div class="flex justify-between items-start">
-          <span class="p-2 rounded-lg bg-[#0f2744] text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-            </svg>
-          </span>
-          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800">
-            Candidate Registry
-          </span>
-        </div>
-        <h3 class="text-base font-bold text-slate-900 mt-3">
-          Student Performance Registry CSV
-        </h3>
-        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-          Export full enrollment registry with roll numbers, academic divisions, departments, total attempt counts, and average cumulative performance.
-        </p>
-      </div>
-
-      <div class="pt-5">
-        <button type="button"
-                onclick="handleDownloadStudentRegistryCsv()"
-                class="btn btn-outline w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          Download Candidate Registry CSV
-        </button>
-      </div>
-    </div>
-
-    <!-- Card 3: Overall 60-Mark Combined Assessment CSV -->
-    <div class="bg-blue-50/40 border-2 border-blue-200 rounded-xl p-5 shadow-xs flex flex-col justify-between md:col-span-2">
-      <div>
-        <div class="flex justify-between items-start">
-          <span class="p-2 rounded-lg bg-[#0f2744] text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
-          </span>
-          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
-            Out of 60 Marks (Combined Units 1–4)
-          </span>
-        </div>
-        <h3 class="text-base font-bold text-slate-900 mt-3">
-          Overall 60-Mark Comprehensive Assessment Report
-        </h3>
-        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-          Aggregated institutional assessment report combining Unit 1, Unit 2, Unit 3, and Unit 4 marks per student with total overall percentage and passing status.
-        </p>
-      </div>
-
-      <div class="pt-5">
-        <button type="button"
-                onclick="handleDownloadOverall60MarksCsv()"
-                class="btn btn-navy w-full text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          Download Overall 60-Mark Results CSV
-        </button>
       </div>
     </div>
   </div>
